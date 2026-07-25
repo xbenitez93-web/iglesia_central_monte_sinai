@@ -12,10 +12,12 @@ export default function Dashboard({ user }) {
       try {
         // 1. Obtener total de miembros
         const snapshotMiembros = await getDocs(collection(db, "miembros"));
+        console.log("Miembros encontrados:", snapshotMiembros.size);
         setTotalMiembros(snapshotMiembros.size);
 
         // 2. Obtener total de eventos de la colección "eventos"
         const snapshotEventos = await getDocs(collection(db, "eventos"));
+        console.log("Eventos encontrados en Firestore:", snapshotEventos.size);
         setTotalEventos(snapshotEventos.size);
 
       } catch (error) {
