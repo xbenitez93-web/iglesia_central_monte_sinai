@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { db } from '../firebase.js'; // Asegúrate de que la ruta a tu archivo firebase.js sea correcta
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc 
+} from 'firebase/firestore';
 
 function EventosPage() {
-  // Cargar eventos desde localStorage o usar datos iniciales de ejemplo
-  const [eventos, setEventos] = useState(() => {
-    const datosGuardados = localStorage.getItem('eventos_iglesia');
-    if (datosGuardados) {
-      try { return JSON.parse(datosGuardados); } catch (e) { console.error(e); }
-    }
-    return [
-      { id: 1, titulo: 'Culto de Adoración Dominical', tipo: 'Culto', fecha: '2026-07-26', hora: '10:00', lugar: 'Templo Principal', descripcion: 'Culto general de adoración y predicación.' },
-      { id: 2, titulo: 'Ensayo General del Coro / Alabanza', tipo: 'Ensayo', fecha: '2026-07-24', hora: '18:30', lugar: 'Sala de Música', descripcion: 'Preparación de cantos para el servicio dominical.' },
-      { id: 3, titulo: 'Boda de Carlos y Ana', tipo: 'Boda', fecha: '2026-08-15', hora: '14:00', lugar: 'Jardines de la Iglesia', descripcion: 'Ceremonia nupcial y recepción.' },
-    ];
-  });
+  const [eventos, setEventos] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
   const [tituloInput, setTituloInput] = useState('');
   const [tipoInput, setTipoInput] = useState('Culto');
@@ -25,9 +24,26 @@ function EventosPage() {
   const [idEditando, setIdEditando] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('Todos');
 
+  // Cargar eventos desde Firebase al iniciar la página
+  const cargarEventos = async () => {
+    try {
+      setCargando(true);
+      const querySnapshot = await getDocs(collection(db, "eventos"));
+      const listaEventos = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setEventos(listaEventos);
+    } catch (error) {
+      console.error("Error al cargar eventos de Firebase: ", error);
+    } finally {
+      setCargando(false);
+    }
+  };
+
   useEffect(() => {
-    localStorage.setItem('eventos_iglesia', JSON.stringify(eventos));
-  }, [eventos]);
+    cargarEventos();
+  }, []);
 
   const abrirModalCrear = () => {
     setIdEditando(null);
@@ -45,46 +61,55 @@ function EventosPage() {
     setTituloInput(ev.titulo);
     setTipoInput(ev.tipo);
     setFechaInput(ev.fecha);
-    setHoraInput(ev.hora);
-    setLugarInput(ev.lugar);
-    setDescripcionInput(ev.descripcion);
+    setHoraInput(ev.hora || '');
+    setLugarInput(ev.lugar || '');
+    setDescripcionInput(ev.descripcion || '');
     setMostrarModal(true);
   };
 
-  const guardarEvento = (e) => {
+  const guardarEvento = async (e) => {
     e.preventDefault();
     if (!tituloInput.trim() || !fechaInput) return;
 
-    if (idEditando !== null) {
-      setEventos(eventos.map(ev => ev.id === idEditando ? {
-        ...ev,
-        titulo: tituloInput.trim(),
-        tipo: tipoInput,
-        fecha: fechaInput,
-        hora: horaInput,
-        lugar: lugarInput.trim(),
-        descripcion: descripcionInput.trim()
-      } : ev));
-    } else {
-      const nuevoEvento = {
-        id: Date.now(),
-        titulo: tituloInput.trim(),
-        tipo: tipoInput,
-        fecha: fechaInput,
-        hora: horaInput,
-        lugar: lugarInput.trim(),
-        descripcion: descripcionInput.trim()
-      };
-      setEventos([nuevoEvento, ...eventos]);
-    }
+    const datosEvento = {
+      titulo: tituloInput.trim(),
+      tipo: tipoInput,
+      fecha: fechaInput,
+      hora: horaInput,
+      lugar: lugarInput.trim(),
+      descripcion: descripcionInput.trim()
+    };
 
-    setMostrarModal(false);
-    setIdEditando(null);
+    try {
+      if (idEditando !== null) {
+        // Actualizar evento existente en Firebase
+        const eventoRef = doc(db, "eventos", idEditando);
+        await updateDoc(eventoRef, datosEvento);
+      } else {
+        // Crear nuevo evento en la colección raíz 'eventos' de Firebase
+        await addDoc(collection(db, "eventos"), datosEvento);
+      }
+
+      // Recargar la lista de eventos desde Firebase
+      await cargarEventos();
+      setMostrarModal(false);
+      setIdEditando(null);
+    } catch (error) {
+      console.error("Error al guardar el evento en Firebase: ", error);
+      alert("Hubo un error al guardar el evento.");
+    }
   };
 
-  const eliminarEvento = (id) => {
-    if (window.confirm("¿Estás seguro de eliminar este evento del calendario?")) {
-      setEventos(eventos.filter(ev => ev.id !== id));
+  const eliminarEvento = async (id) => {
+    if (window.confirm("¿Estás seguro de eliminar este evento de la base de datos?")) {
+      try {
+        await deleteDoc(doc(db, "eventos", id));
+        // Actualizar la lista local filtrando el eliminado
+        setEventos(eventos.filter(ev => ev.id !== id));
+      } catch (error) {
+        console.error("Error al eliminar el evento: ", error);
+        alert("Hubo un error al eliminar el evento.");
+      }
     }
   };
 
@@ -135,7 +160,11 @@ function EventosPage() {
 
       {/* Lista / Tarjetas de Eventos */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-        {eventosFiltrados.length === 0 ? (
+        {cargando ? (
+          <div style={{ gridColumn: '1 / -1', background: '#fff', padding: '40px', textAlign: 'center', borderRadius: '8px', color: '#718096' }}>
+            Cargando eventos desde la base de datos...
+          </div>
+        ) : eventosFiltrados.length === 0 ? (
           <div style={{ gridColumn: '1 / -1', background: '#fff', padding: '40px', textAlign: 'center', borderRadius: '8px', color: '#a0aec0' }}>
             No hay eventos programados en esta categoría.
           </div>
@@ -284,4 +313,3 @@ function EventosPage() {
 }
 
 export default EventosPage;
-
