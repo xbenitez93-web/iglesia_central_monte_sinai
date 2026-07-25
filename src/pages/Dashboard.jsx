@@ -4,13 +4,20 @@ import { collection, getDocs } from 'firebase/firestore';
 
 export default function Dashboard({ user }) {
   const [totalMiembros, setTotalMiembros] = useState(0);
+  const [totalEventos, setTotalEventos] = useState(0);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     const obtenerEstadisticas = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "miembros"));
-        setTotalMiembros(querySnapshot.size);
+        // 1. Obtener total de miembros
+        const snapshotMiembros = await getDocs(collection(db, "miembros"));
+        setTotalMiembros(snapshotMiembros.size);
+
+        // 2. Obtener total de eventos de la colección "eventos"
+        const snapshotEventos = await getDocs(collection(db, "eventos"));
+        setTotalEventos(snapshotEventos.size);
+
       } catch (error) {
         console.error("Error al obtener estadísticas:", error);
       } finally {
@@ -54,7 +61,7 @@ export default function Dashboard({ user }) {
 
           <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', minWidth: '200px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #d69e2e' }}>
             <p style={{ margin: '0 0 8px 0', color: '#718096', fontSize: '14px', fontWeight: '600' }}>Agenda / Eventos</p>
-            <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.8rem' }}>0</h3>
+            <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.8rem' }}>{cargando ? "..." : totalEventos}</h3>
           </div>
 
           <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', minWidth: '200px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #805ad5' }}>
