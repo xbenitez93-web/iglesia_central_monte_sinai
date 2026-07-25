@@ -1,0 +1,257 @@
+/* --- RESET & LAYOUT GLOBAL --- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #1a202c;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding-top: 60px; /* Espacio exacto para el header fijo */
+  color: #2d3748;
+}
+
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: #f7fafc;
+}
+
+/* --- ENCABEZADO SUPERIOR FIJO --- */
+.mobile-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background-color: #1a202c;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  gap: 15px;
+}
+
+.hamburger-icon {
+  font-size: 26px;
+  cursor: pointer;
+  color: #ffffff;
+  user-select: none;
+}
+
+.mobile-header-title {
+  font-size: 17px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* --- FONDO OSCURO TRASLÚCIDO (OVERLAY) --- */
+.menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1001;
+}
+
+/* --- MENÚ LATERAL TIPO DRAWER --- */
+.side-drawer {
+  position: fixed;
+  top: 0;
+  left: -280px;
+  width: 280px;
+  height: 100vh;
+  background-color: #1a202c;
+  z-index: 1002;
+  display: flex;
+  flex-direction: column;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 15px rgba(0,0,0,0.4);
+}
+
+.side-drawer.open {
+  left: 0;
+}
+
+.drawer-header {
+  padding: 24px 20px;
+  border-bottom: 1px solid #2d3748;
+}
+
+.drawer-header h3 {
+  color: #ffffff;
+  font-size: 15px;
+  letter-spacing: 1px;
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.drawer-options {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  overflow-y: auto;
+}
+
+.drawer-item {
+  background: none;
+  border: none;
+  color: #a0aec0;
+  text-align: left;
+  padding: 16px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  border-bottom: 1px solid #2d3748;
+  transition: background 0.2s, color 0.2s;
+}
+
+.drawer-item .icon {
+  font-size: 18px;
+}
+
+.drawer-item:hover, 
+.drawer-item.active {
+  color: #ffffff;
+  background-color: #2d3748;
+}
+
+.drawer-footer {
+  padding: 10px 0;
+  border-top: 1px solid #2d3748;
+}
+
+.drawer-item.logout {
+  color: #fc8181;
+  border-bottom: none;
+}
+
+.drawer-item.logout:hover {
+  background-color: rgba(252, 129, 129, 0.1);
+}
+
+/* --- CONTENEDOR PRINCIPAL --- */
+.main-content {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background-color: #f7fafc;
+}
+
+.main-content > div {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+/* --- TARJETAS DEL DASHBOARD --- */
+.dashboard-card {
+  background-color: #1a202c;
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  border: 1px solid #2d3748;
+  width: 100%;
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.card-icon.blue { background-color: rgba(49, 130, 206, 0.15); color: #3182ce; }
+.card-icon.purple { background-color: rgba(159, 122, 234, 0.15); color: #9f7aea; }
+.card-icon.green { background-color: rgba(72, 187, 120, 0.15); color: #48bb78; }
+.card-icon.orange { background-color: rgba(237, 137, 54, 0.15); color: #ed8936; }
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-label {
+  color: #a0aec0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.card-value {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* --- ESTANDARIZACIÓN DE PÁGINAS INTERNAS --- */
+.main-content h1, 
+.main-content h2, 
+.main-content h3 {
+  color: #1a202c;
+  margin-top: 0;
+  font-size: 20px !important;
+  text-align: center;
+}
+
+.main-content button {
+  padding: 12px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-sizing: border-box;
+}
+
+.main-content input, 
+.main-content select, 
+.main-content textarea {
+  width: 100% !important;
+  padding: 12px 14px;
+  font-size: 14px;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  background-color: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.main-content input:focus {
+  border-color: #3182ce;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}

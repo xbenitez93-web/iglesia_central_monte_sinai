@@ -1,0 +1,15 @@
+{
+  "short_name": "Monte Sinai",
+  "name": "Iglesia Central Monte Sinai",
+  "icons": [
+    {
+      "src": "/sinai_app.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1a202c",
+  "theme_color": "#1a202c",
+  "display": "standalone"
+}
