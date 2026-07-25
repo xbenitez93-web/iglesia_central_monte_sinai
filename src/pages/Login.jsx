@@ -66,10 +66,12 @@ export default function Login({ onLoginSuccess }) {
       console.error("Error de autenticación:", err);
       let mensajeAmigable = "Revisa tus datos.";
       
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        mensajeAmigable = "Contraseña incorrecta o usuario no encontrado.";
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+        mensajeAmigable = "Contraseña incorrecta o el usuario ya existe con otra contraseña.";
       } else if (err.code === 'auth/weak-password') {
         mensajeAmigable = "La contraseña debe tener al menos 6 caracteres.";
+      } else if (err.code === 'auth/email-already-in-use') {
+        mensajeAmigable = "Este nombre de usuario ya está registrado. Cambia a 'Iniciar sesión'.";
       }
 
       setError(mensajeAmigable);
