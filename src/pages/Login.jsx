@@ -115,7 +115,7 @@ export default function Login({ onLoginSuccess }) {
           <label style={{ color: '#cbd5e0', fontSize: '14px' }}>Nombre de usuario</label>
           <input 
             type="text" 
-            placeholder="ej. xavier"
+            placeholder="ej. pastor"
             value={usuario} 
             onChange={(e) => setUsuario(e.target.value)} 
             required 

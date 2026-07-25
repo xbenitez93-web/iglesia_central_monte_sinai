@@ -121,9 +121,9 @@ export default function App() {
           ☰
         </div>
         <div className="mobile-header-title">
-          {pestanaActiva === 'dashboard' && 'Dashboard'}
-          {pestanaActiva === 'directorio' && 'Directorio y Células'}
-          {pestanaActiva === 'finanzas' && 'Finanzas y Mayordomía'}
+          {pestanaActiva === 'dashboard' && 'Portada'}
+          {pestanaActiva === 'directorio' && 'Directorio'}
+          {pestanaActiva === 'finanzas' && 'Finanzas'}
           {pestanaActiva === 'cooperativa' && 'Mini Cooperativa'}
           {pestanaActiva === 'eventos' && 'Eventos y Calendario'}
           {pestanaActiva === 'roles' && 'Configuración y Roles'}

@@ -6,19 +6,8 @@ export default function CooperativaPage() {
   const [movimientos, setMovimientos] = useState([]);
   const [capitalTotal, setCapitalTotal] = useState(0);
 
-  // Lista de eventos/cooperativas con metas y etiquetas de categoría personalizables
-  const [eventosCoop, setEventosCoop] = useState([
-    { 
-      id: 'campamento_2026', 
-      nombre: 'Campamento Anual 2026', 
-      etiquetasEdad: {
-        cat1: 'Menor de 9 años',
-        cat2: 'Mayor de 10 años',
-        cat3: 'Tercera Edad'
-      },
-      metasEdad: { cat1: 800, cat2: 1200, cat3: 900 } 
-    }
-  ]);
+  // Lista de eventos/cooperativas sincronizada con Firebase
+  const [eventosCoop, setEventosCoop] = useState([]);
 
   // Estados para el formulario de Crear o Editar Evento/Cooperativa y sus etiquetas
   const [modoEdicionEvento, setModoEdicionEvento] = useState(false);
@@ -39,16 +28,34 @@ export default function CooperativaPage() {
   // Estados para el formulario de nuevo aporte / abono adicional
   const [modoAbonoAdicional, setModoAbonoAdicional] = useState(false);
   const [nombreSocio, setNombreSocio] = useState("");
-  const [eventoSeleccionado, setEventoSeleccionado] = useState('campamento_2026');
+  const [eventoSeleccionado, setEventoSeleccionado] = useState("");
   const [categoriaEdad, setCategoriaEdad] = useState('cat2'); 
   const [tipo, setTipo] = useState("ahorro");
   const [monto, setMonto] = useState("");
   const [observacion, setObservacion] = useState("");
   const [cargando, setCargando] = useState(false);
 
-  // Escuchar transacciones de la cooperativa en tiempo real
+  // 1. Escuchar los tipos de cooperativas / eventos desde Firebase en tiempo real
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "coop_transacciones"), (snapshot) => {
+    const unsubscribeEv = onSnapshot(collection(db, "config_cooperativas"), (snapshot) => {
+      let listaEvs = [];
+      snapshot.forEach((docItem) => {
+        listaEvs.push({ docFirebaseId: docItem.id, ...docItem.data() });
+      });
+      setEventosCoop(listaEvs);
+      
+      // Si hay eventos y no hay uno seleccionado, seleccionar el primero por defecto
+      if (listaEvs.length > 0 && (!eventoSeleccionado || !listaEvs.some(e => e.id === eventoSeleccionado))) {
+        setEventoSeleccionado(listaEvs[0].id);
+      }
+    });
+
+    return () => unsubscribeEv();
+  }, [eventoSeleccionado]);
+
+  // 2. Escuchar transacciones de la cooperativa en tiempo real
+  useEffect(() => {
+    const unsubscribeTrans = onSnapshot(collection(db, "coop_transacciones"), (snapshot) => {
       let lista = [];
       let sumaTotal = 0;
       
@@ -70,7 +77,7 @@ export default function CooperativaPage() {
       setCapitalTotal(sumaTotal);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeTrans();
   }, []);
 
   // Calcular el total abonado por un miembro específico en un evento específico
@@ -97,7 +104,7 @@ export default function CooperativaPage() {
 
   const abrirEditarEvento = (ev) => {
     setModoEdicionEvento(true);
-    setEventoIdEditando(ev.id);
+    setEventoIdEditando(ev.docFirebaseId); // Usamos el ID del documento de Firestore
     setNombreEvento(ev.nombre);
     setLabelCat1(ev.etiquetasEdad?.cat1 || "Menor de 9 años");
     setLabelCat2(ev.etiquetasEdad?.cat2 || "Mayor de 10 años");
@@ -109,7 +116,7 @@ export default function CooperativaPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleGuardarEvento = (e) => {
+  const handleGuardarEvento = async (e) => {
     e.preventDefault();
     if (!nombreEvento) return;
 
@@ -125,45 +132,47 @@ export default function CooperativaPage() {
       cat3: Number(metaCat3) || 0
     };
 
-    if (modoEdicionEvento) {
-      setEventosCoop(eventosCoop.map(ev => {
-        if (ev.id === eventoIdEditando) {
-          return {
-            ...ev,
-            nombre: nombreEvento.trim(),
-            etiquetasEdad: nuevasEtiquetas,
-            metasEdad: nuevasMetas
-          };
-        }
-        return ev;
-      }));
-      alert("¡Cooperativa y etiquetas actualizadas con éxito!");
-    } else {
-      const nuevoId = nombreEvento.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
-      const nuevoEventoObj = {
-        id: nuevoId,
-        nombre: nombreEvento.trim(),
-        etiquetasEdad: nuevasEtiquetas,
-        metasEdad: nuevasMetas
-      };
-      setEventosCoop([...eventosCoop, nuevoEventoObj]);
-      setEventoSeleccionado(nuevoId);
-      alert("¡Nueva cooperativa creada con éxito!");
+    try {
+      if (modoEdicionEvento) {
+        // Actualizar en Firebase Firestore
+        const docRef = doc(db, "config_cooperativas", eventoIdEditando);
+        await updateDoc(docRef, {
+          nombre: nombreEvento.trim(),
+          etiquetasEdad: nuevasEtiquetas,
+          metasEdad: nuevasMetas
+        });
+        alert("¡Cooperativa y etiquetas actualizadas en la nube con éxito!");
+      } else {
+        // Crear nuevo en Firebase Firestore
+        const nuevoId = nombreEvento.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
+        await addDoc(collection(db, "config_cooperativas"), {
+          id: nuevoId,
+          nombre: nombreEvento.trim(),
+          etiquetasEdad: nuevasEtiquetas,
+          metasEdad: nuevasMetas
+        });
+        setEventoSeleccionado(nuevoId);
+        alert("¡Nueva cooperativa creada en la nube con éxito!");
+      }
+      setMostrarFormEvento(false);
+    } catch (error) {
+      console.error("Error al guardar cooperativa:", error);
+      alert("Hubo un error al guardar los cambios.");
     }
-
-    setMostrarFormEvento(false);
   };
 
-  const handleEliminarEvento = (id) => {
+  const handleEliminarEvento = async (docFirebaseId, eventId) => {
     if (eventosCoop.length <= 1) {
       alert("Debes mantener al menos un tipo de cooperativa activo.");
       return;
     }
-    if (window.confirm("¿Estás seguro de eliminar este tipo de cooperativa?")) {
-      const filtrados = eventosCoop.filter(ev => ev.id !== id);
-      setEventosCoop(filtrados);
-      if (eventoSeleccionado === id) {
-        setEventoSeleccionado(filtrados[0].id);
+    if (window.confirm("¿Estás seguro de eliminar este tipo de cooperativa de la base de datos?")) {
+      try {
+        await deleteDoc(doc(db, "config_cooperativas", docFirebaseId));
+        alert("Cooperativa eliminada correctamente.");
+      } catch (error) {
+        console.error("Error al eliminar:", error);
+        alert("No se pudo eliminar el registro.");
       }
     }
   };
@@ -175,25 +184,20 @@ export default function CooperativaPage() {
       return;
     }
 
-    // Cabeceras del archivo CSV (compatibles con Excel)
-    let csvContent = "\uFEFF"; // BOM para asegurar caracteres UTF-8 (acentos y eñes en Excel)
+    let csvContent = "\uFEFF"; 
     csvContent += "Socio,Cooperativa / Evento,Categoría,Meta Asignada (Lps),Total Abonado (Lps),Tipo Movimiento,Monto Movimiento (Lps),Observación,Fecha\n";
 
     movimientos.forEach((m) => {
       const evObj = eventosCoop.find(ev => ev.id === m.evento);
       const nombreCoop = evObj ? evObj.nombre : 'Cooperativa';
       
-      // Obtener nombre de la etiqueta y meta correspondiente
       const catKey = m.categoriaEdad || 'cat1';
       const etiquetaCat = evObj?.etiquetasEdad?.[catKey] || 'Categoría';
       const metaCat = evObj?.metasEdad?.[catKey] || 0;
       
-      // Total general acumulado por el socio en ese evento
       const totalAbonadoSocio = calcularAbonoMiembro(m.socio, m.evento);
-      
       const fechaFormateada = m.createdAt?.toDate ? m.createdAt.toDate().toLocaleString() : 'Reciente';
 
-      // Limpiar comillas en los textos para evitar romper columnas
       const socioLim = `"${(m.socio || '').replace(/"/g, '""')}"`;
       const coopLim = `"${nombreCoop.replace(/"/g, '""')}"`;
       const catLim = `"${etiquetaCat.replace(/"/g, '""')}"`;
@@ -201,21 +205,12 @@ export default function CooperativaPage() {
       const fechaLim = `"${fechaFormateada}"`;
 
       const fila = [
-        socioLim,
-        coopLim,
-        catLim,
-        metaCat,
-        totalAbonadoSocio,
-        m.tipo,
-        m.monto,
-        obsLim,
-        fechaLim
+        socioLim, coopLim, catLim, metaCat, totalAbonadoSocio, m.tipo, m.monto, obsLim, fechaLim
       ].join(",");
 
       csvContent += fila + "\n";
     });
 
-    // Crear archivo descargable y activar descarga automática
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -260,7 +255,7 @@ export default function CooperativaPage() {
   const abrirAbonoAdicional = (m) => {
     setModoAbonoAdicional(true);
     setNombreSocio(m.socio || "");
-    setEventoSeleccionado(m.evento || eventosCoop[0].id);
+    setEventoSeleccionado(m.evento || (eventosCoop[0]?.id ?? ""));
     setCategoriaEdad(m.categoriaEdad || "cat2");
     setTipo("ahorro"); 
     setMonto(""); 
@@ -302,7 +297,7 @@ export default function CooperativaPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ color: '#2d3748', fontSize: '1.4rem', margin: '0 0 5px 0' }}>Mini Cooperativa y Tipos de Ahorro</h2>
-          <p style={{ color: '#718096', fontSize: '13px', margin: 0 }}>Gestiona múltiples fondos, etiquetas personalizadas y aportes individuales.</p>
+          <p style={{ color: '#718096', fontSize: '13px', margin: 0 }}>Gestiona múltiples fondos, etiquetas personalizadas y aportes individuales en la nube.</p>
         </div>
         <button 
           onClick={abrirCrearEvento}
@@ -322,13 +317,13 @@ export default function CooperativaPage() {
         <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: '#63b3ed' }}>Tipos de Cooperativa / Fondos Activos</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '15px' }}>
           {eventosCoop.map((ev) => (
-            <div key={ev.id} style={{ background: '#1a202c', padding: '15px', borderRadius: '6px', border: '1px solid #4a5568', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+            <div key={ev.docFirebaseId} style={{ background: '#1a202c', padding: '15px', borderRadius: '6px', border: '1px solid #4a5568', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
               <div>
                 <h4 style={{ margin: '0 0 8px 0', color: '#fff', fontSize: '1rem' }}>{ev.nombre}</h4>
                 <div style={{ fontSize: '12px', color: '#a0aec0', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <span>• {ev.etiquetasEdad.cat1}: <strong style={{ color: '#68d391' }}>{ev.metasEdad.cat1} Lps</strong></span>
-                  <span>• {ev.etiquetasEdad.cat2}: <strong style={{ color: '#68d391' }}>{ev.metasEdad.cat2} Lps</strong></span>
-                  <span>• {ev.etiquetasEdad.cat3}: <strong style={{ color: '#68d391' }}>{ev.metasEdad.cat3} Lps</strong></span>
+                  <span>• {ev.etiquetasEdad?.cat1}: <strong style={{ color: '#68d391' }}>{ev.metasEdad?.cat1} Lps</strong></span>
+                  <span>• {ev.etiquetasEdad?.cat2}: <strong style={{ color: '#68d391' }}>{ev.metasEdad?.cat2} Lps</strong></span>
+                  <span>• {ev.etiquetasEdad?.cat3}: <strong style={{ color: '#68d391' }}>{ev.metasEdad?.cat3} Lps</strong></span>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
@@ -339,7 +334,7 @@ export default function CooperativaPage() {
                   Editar Etiquetas / Metas
                 </button>
                 <button 
-                  onClick={() => handleEliminarEvento(ev.id)}
+                  onClick={() => handleEliminarEvento(ev.docFirebaseId, ev.id)}
                   style={{ background: '#e53e3e', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
                 >
                   Eliminar
@@ -444,7 +439,7 @@ export default function CooperativaPage() {
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
               <button type="submit" style={{ background: '#38a169', color: '#fff', padding: '12px 20px', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>
-                {modoEdicionEvento ? 'Actualizar Cooperativa y Etiquetas' : 'Guardar Nueva Cooperativa'}
+                {modoEdicionEvento ? 'Actualizar Cooperativa en la Nube' : 'Guardar Nueva Cooperativa'}
               </button>
               <button type="button" onClick={() => setMostrarFormEvento(false)} style={{ background: '#4a5568', color: '#fff', padding: '12px 20px', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
                 Cancelar
