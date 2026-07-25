@@ -189,7 +189,7 @@ export default function Miembros() {
                         borderRadius: '4px', 
                         fontSize: '12px', 
                         fontWeight: 'bold',
-                        background: u.rol === 'admin' ? '#2b6cb0' : (u.rol === 'tesorero' ? '#276749' : '#4a5568'),
+                        background: u.rol === 'admin' ? '#2b6cb0' : (u.rol === 'tesorero' ? '#276749' : (u.rol === 'lider' ? '#3182ce' : '')),
                         color: '#fff'
                       }}>
                         {u.rol || 'miembro'}
@@ -202,6 +202,7 @@ export default function Miembros() {
                         style={{ padding: '6px', borderRadius: '4px', background: '#1a202c', color: '#fff', border: '1px solid #4a5568' }}
                       >
                         <option value="miembro">Miembro</option>
+                        <option value="lider">Líder</option>
                         <option value="tesorero">Tesorero</option>
                         <option value="admin">Administrador</option>
                       </select>

@@ -14,6 +14,13 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [cargandoAuth, setCargandoAuth] = useState(true);
   const [rolUsuario, setRolUsuario] = useState('miembro'); 
+  const [permisosModulos, setPermisosModulos] = useState({
+    directorio: false,
+    finanzas: false,
+    eventos: false,
+    administracion: false,
+    cooperativa: false
+  });
   const [pestanaActiva, setPestanaActiva] = useState('dashboard');
   const [menuAbierto, setMenuAbierto] = useState(false);
   
@@ -32,10 +39,14 @@ export default function App() {
           const docRef = doc(db, "usuarios", currentUser.uid);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
-            setRolUsuario(docSnap.data().rol || 'miembro');
+            const dataUser = docSnap.data();
+            setRolUsuario(dataUser.rol || 'miembro');
+            if (dataUser.permisosModulos) {
+              setPermisosModulos(dataUser.permisosModulos);
+            }
           }
         } catch (error) {
-          console.error("Error al obtener el rol:", error);
+          console.error("Error al obtener el rol y permisos:", error);
         }
       }
       setCargandoAuth(false);
@@ -114,6 +125,16 @@ export default function App() {
     setMenuAbierto(false);
   };
 
+  // --- VALIDACIÓN DE PERMISOS GRANULARES ESTRICTA ---
+  const esAdmin = rolUsuario === 'admin';
+
+  // Si es Admin tiene acceso total, de lo contrario solo si Firestore indica estrictamente true
+  const verDirectorio = esAdmin || (permisosModulos.directorio === true);
+  const verFinanzas = esAdmin || (permisosModulos.finanzas === true);
+  const verCooperativa = esAdmin || (permisosModulos.cooperativa === true);
+  const verEventos = esAdmin || (permisosModulos.eventos === true);
+  const verRolesConfig = esAdmin || (permisosModulos.administracion === true);
+
   return (
     <div className="app-layout">
       <header className="mobile-header">
@@ -147,6 +168,7 @@ export default function App() {
         </div>
 
         <div className="drawer-options">
+          {/* Portada visible para todos */}
           <button 
             className={pestanaActiva === 'dashboard' ? 'drawer-item active' : 'drawer-item'}
             onClick={() => cambiarSeccion('dashboard')}
@@ -154,14 +176,18 @@ export default function App() {
             <span className="icon">📊</span> Portada
           </button>
           
-          <button 
-            className={pestanaActiva === 'directorio' ? 'drawer-item active' : 'drawer-item'}
-            onClick={() => cambiarSeccion('directorio')}
-          >
-            <span className="icon">👥</span> Directorio
-          </button>
+          {/* Directorio filtrado por permisos */}
+          {verDirectorio && (
+            <button 
+              className={pestanaActiva === 'directorio' ? 'drawer-item active' : 'drawer-item'}
+              onClick={() => cambiarSeccion('directorio')}
+            >
+              <span className="icon">👥</span> Directorio
+            </button>
+          )}
           
-          {(rolUsuario === 'admin' || rolUsuario === 'tesorero') && (
+          {/* Finanzas filtrado por permisos */}
+          {verFinanzas && (
             <button 
               className={pestanaActiva === 'finanzas' ? 'drawer-item active' : 'drawer-item'}
               onClick={() => cambiarSeccion('finanzas')}
@@ -170,8 +196,8 @@ export default function App() {
             </button>
           )}
 
-          {/* Módulo de Mini Cooperativa (Visible para admin y tesorero) */}
-          {(rolUsuario === 'admin' || rolUsuario === 'tesorero') && (
+          {/* Mini Cooperativa filtrado por permisos */}
+          {verCooperativa && (
             <button 
               className={pestanaActiva === 'cooperativa' ? 'drawer-item active' : 'drawer-item'}
               onClick={() => cambiarSeccion('cooperativa')}
@@ -180,14 +206,18 @@ export default function App() {
             </button>
           )}
           
-          <button 
-            className={pestanaActiva === 'eventos' ? 'drawer-item active' : 'drawer-item'}
-            onClick={() => cambiarSeccion('eventos')}
-          >
-            <span className="icon">📅</span> Eventos y Calendario
-          </button>
+          {/* Eventos filtrado por permisos */}
+          {verEventos && (
+            <button 
+              className={pestanaActiva === 'eventos' ? 'drawer-item active' : 'drawer-item'}
+              onClick={() => cambiarSeccion('eventos')}
+            >
+              <span className="icon">📅</span> Eventos y Calendario
+            </button>
+          )}
 
-          {rolUsuario === 'admin' && (
+          {/* Configuración de Roles / Administración filtrado por permisos */}
+          {verRolesConfig && (
             <button 
               className={pestanaActiva === 'roles' ? 'drawer-item active' : 'drawer-item'}
               onClick={() => cambiarSeccion('roles')}
@@ -207,7 +237,6 @@ export default function App() {
       <main className="main-content">
         {pestanaActiva === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
-            {/* Tarjeta de Bienvenida Centrada con Logo */}
             <div className="dashboard-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '25px', background: '#2d3748', borderRadius: '8px', color: '#fff' }}>
               <img 
                 src="/sinai_app.png" 
@@ -216,7 +245,7 @@ export default function App() {
               />
               <div className="card-info">
                 <span className="card-label" style={{ fontSize: '35px', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '1px' }}>Bienvenido</span>
-                <div className="card-value" style={{ fontSize: '18px', color: '#63b3ed', fontWeight: 'bold', marginTop: '4px' }}>{user.email}</div>
+                <div className="card-value" style={{ fontSize: '18px', color: '#63b3ed', fontWeight: 'bold', marginTop: '4px' }}>{user.email} (Rol: {rolUsuario})</div>
               </div>
             </div>
 
@@ -228,10 +257,12 @@ export default function App() {
                 <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.8rem' }}>{totalMiembros}</h3>
               </div>
 
-              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #38a169' }}>
-                <p style={{ margin: '0 0 8px 0', color: '#718096', fontSize: '14px', fontWeight: '600' }}>Total Ofrendas</p>
-                <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.8rem' }}>${totalOfrendas.toLocaleString()}</h3>
-              </div>
+              {verFinanzas && (
+                <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #38a169' }}>
+                  <p style={{ margin: '0 0 8px 0', color: '#718096', fontSize: '14px', fontWeight: '600' }}>Total Ofrendas</p>
+                  <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.8rem' }}>${totalOfrendas.toLocaleString()}</h3>
+                </div>
+              )}
 
               <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #d69e2e' }}>
                 <p style={{ margin: '0 0 8px 0', color: '#718096', fontSize: '14px', fontWeight: '600' }}>Agenda / Eventos</p>
@@ -247,11 +278,11 @@ export default function App() {
           </div>
         )}
 
-        {pestanaActiva === 'directorio' && <Directorio />}
-        {pestanaActiva === 'finanzas' && <FinancePage />}
-        {pestanaActiva === 'cooperativa' && <CooperativaPage />}
-        {pestanaActiva === 'eventos' && <EventosPage />}
-        {pestanaActiva === 'roles' && <Miembros />}
+        {pestanaActiva === 'directorio' && verDirectorio && <Directorio />}
+        {pestanaActiva === 'finanzas' && verFinanzas && <FinancePage />}
+        {pestanaActiva === 'cooperativa' && verCooperativa && <CooperativaPage />}
+        {pestanaActiva === 'eventos' && verEventos && <EventosPage />}
+        {pestanaActiva === 'roles' && verRolesConfig && <Miembros />}
       </main>
     </div>
   );
