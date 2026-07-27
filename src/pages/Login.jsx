@@ -1,196 +1,245 @@
 import React, { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { collection, getDocs, setDoc, doc } from 'firebase/firestore';
+import { auth, db } from '../firebase'; // Ajusta la ruta si es necesario
 
-export default function Login({ onLoginSuccess }) {
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [nombre, setNombre] = useState('');
-  const [usuario, setUsuario] = useState('');
+export default function Login() {
+  const [identificador, setIdentificador] = useState('');
   const [password, setPassword] = useState('');
+  const [nombre, setNombre] = useState('');
   const [error, setError] = useState('');
-  const [cargando, setCargando] = useState(false);
+  const [esRegistro, setEsRegistro] = useState(false);
 
-  const [estilos, setEstilos] = useState(() => {
-    const guardado = localStorage.getItem('congregacion360_estilos');
-    if (guardado) {
-      const parsed = JSON.parse(guardado);
-      return parsed.directorio || {};
-    }
-    return {
-      boton: '#3182ce',
-      fondo: '#1a202c',
-      tipografia: 'Inter, sans-serif',
-      encabezadoColor: '#ffffff',
-      encabezadoTamano: '24px',
-      encabezadoNegrita: true,
-      encabezadoCursiva: false,
-      subtituloColor: '#a0aec0',
-      subtituloTamano: '14px',
-      subtituloNegrita: false,
-      subtituloCursiva: false
-    };
-  });
-
-  useEffect(() => {
-    const actualizarEstilosLocales = () => {
-      const guardado = localStorage.getItem('congregacion360_estilos');
-      if (guardado) {
-        const parsed = JSON.parse(guardado);
-        if (parsed.directorio) setEstilos(parsed.directorio);
-      }
-    };
-    window.addEventListener('estilosActualizados', actualizarEstilosLocales);
-    return () => window.removeEventListener('estilosActualizados', actualizarEstilosLocales);
-  }, []);
+  // Cargar estilos personalizados con respaldo seguro
+  const guardarEstilos = JSON.parse(localStorage.getItem('congregacion360_estilos')) || {};
+  const estiloLogin = guardarEstilos.login || {
+    fondo: '#1a202c',
+    boton: '#3182ce',
+    tipografia: 'Inter, sans-serif',
+    encabezadoColor: '#ffffff',
+    encabezadoTamano: '24px',
+    encabezadoNegrita: true,
+    encabezadoCursiva: false,
+    subtituloColor: '#a0aec0',
+    subtituloTamano: '14px',
+    subtituloNegrita: false,
+    subtituloCursiva: false
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setCargando(true);
     setError('');
 
-    const emailFicticio = `${usuario.trim().toLowerCase()}@sinai.central`;
+    let emailParaFirebase = identificador.trim().toLowerCase();
 
-    try {
-      if (isRegistering) {
-        const querySnapshot = await getDocs(collection(db, "usuarios"));
-        const esElPrimerUsuario = querySnapshot.empty;
-        const rolAsignado = esElPrimerUsuario ? 'admin' : 'miembro';
+    // Si no incluye '@', le agregamos el dominio interno por defecto
+    if (!emailParaFirebase.includes('@')) {
+      emailParaFirebase = `${emailParaFirebase}@sinai.central`;
+    }
 
-        let user;
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, emailFicticio, password);
-          user = userCredential.user;
-        } catch (authError) {
-          if (authError.code === 'auth/email-already-in-use') {
-            const loginCredential = await signInWithEmailAndPassword(auth, emailFicticio, password);
-            user = loginCredential.user;
-          } else {
-            throw authError;
-          }
-        }
+    if (esRegistro) {
+      // --- LÓGICA DE REGISTRO ---
+      try {
+        // Verificar si ya existen usuarios en la colección para saber si este será el admin
+        const usuariosSnapshot = await getDocs(collection(db, "usuarios"));
+        const esPrimerUsuario = usuariosSnapshot.empty;
+        const rolAsignado = esPrimerUsuario ? 'admin' : 'miembro';
 
-        await setDoc(doc(db, "usuarios", user.uid), {
-          nombre: nombre,
-          usuario: usuario.trim().toLowerCase(),
+        // Crear usuario en Firebase Auth
+        const credencial = await createUserWithEmailAndPassword(auth, emailParaFirebase, password);
+        const uid = credencial.user.uid;
+
+        // Crear documento del usuario en Firestore
+        await setDoc(doc(db, "usuarios", uid), {
+          nombre: nombre.trim() || identificador.trim(),
+          usuario: identificador.trim().toLowerCase(),
+          email: emailParaFirebase,
           rol: rolAsignado,
-          createdAt: new Date()
-        }, { merge: true });
+          permisosModulos: {
+            directorio: true,
+            finanzas: true,
+            eventos: true,
+            administracion: true,
+            cooperativa: true
+          },
+          fechaCreacion: new Date().toISOString()
+        });
 
-        if (esElPrimerUsuario) {
-          alert("¡Cuenta configurada con éxito! Al ser el primer usuario, se te ha asignado el rol de Administrador.");
+        alert(esPrimerUsuario 
+          ? "¡Registro exitoso! Como eres el primer usuario, se te ha asignado el rol de Administrador." 
+          : "¡Registro exitoso! Tu cuenta ha sido creada correctamente."
+        );
+      } catch (err) {
+        console.error("Error en registro:", err);
+        if (err.code === 'auth/email-already-in-use') {
+          setError("Este nombre de usuario o correo ya está registrado.");
+        } else if (err.code === 'auth/weak-password') {
+          setError("La contraseña debe tener al menos 6 caracteres.");
         } else {
-          alert("¡Cuenta creada con éxito!");
+          setError("Error al registrar el usuario. Inténtalo de nuevo.");
         }
-
-        onLoginSuccess(user);
-      } else {
-        const userCredential = await signInWithEmailAndPassword(auth, emailFicticio, password);
-        onLoginSuccess(userCredential.user);
       }
-    } catch (err) {
-      console.error("Error de autenticación:", err);
-      let mensajeAmigable = "Revisa tus datos.";
-      
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
-        mensajeAmigable = "Contraseña incorrecta o el usuario ya existe con otra contraseña.";
-      } else if (err.code === 'auth/weak-password') {
-        mensajeAmigable = "La contraseña debe tener al menos 6 caracteres.";
-      } else if (err.code === 'auth/email-already-in-use') {
-        mensajeAmigable = "Este nombre de usuario ya está registrado. Cambia a 'Iniciar sesión'.";
+    } else {
+      // --- LÓGICA DE INICIO DE SESIÓN ---
+      try {
+        await signInWithEmailAndPassword(auth, emailParaFirebase, password);
+      } catch (err) {
+        console.error("Error en login:", err);
+        setError("Usuario o contraseña incorrectos.");
       }
-
-      setError(mensajeAmigable);
-    } finally {
-      setCargando(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: estilos.fondo || '#1a202c', padding: '20px', fontFamily: estilos.tipografia || 'Inter, sans-serif' }}>
-      <form onSubmit={handleSubmit} style={{ background: '#2d3748', padding: '30px', borderRadius: '10px', width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+    <div style={{ 
+      background: estiloLogin.fondo, 
+      fontFamily: estiloLogin.tipografia, 
+      minHeight: '100vh', 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center',
+      padding: '20px' 
+    }}>
+      <div style={{ maxWidth: '400px', width: '100%', padding: '30px', background: '#2d3748', borderRadius: '8px', boxSizing: 'border-box' }}>
         
-        <img 
-          src="/sinai_app.png" 
-          alt="Iglesia Central Monte Sinai" 
-          style={{ width: '130px', height: '130px', objectFit: 'contain', marginBottom: '5px' }} 
-        />
+        {/* Contenedor del Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <img 
+            src="/sinai_app.png" 
+            alt="Iglesia Central Monte Sinai" 
+            style={{ width: '80px', height: '80px', objectFit: 'contain', margin: '0 auto' }}
+            onError={(e) => { e.target.style.display = 'none'; }} 
+          />
+        </div>
 
-        <h2 style={{ 
-          color: estilos.encabezadoColor || '#fff', 
-          fontSize: estilos.encabezadoTamano || '24px', 
-          fontWeight: estilos.encabezadoNegrita ? 'bold' : 'normal', 
-          fontStyle: estilos.encabezadoCursiva ? 'italic' : 'normal',
-          textAlign: 'center', 
-          marginBottom: '0' 
+        <h1 style={{ 
+          color: estiloLogin.encabezadoColor, 
+          fontSize: estiloLogin.encabezadoTamano, 
+          fontWeight: estiloLogin.encabezadoNegrita ? 'bold' : 'normal',
+          fontStyle: estiloLogin.encabezadoCursiva ? 'italic' : 'normal',
+          textAlign: 'center',
+          marginBottom: '10px'
         }}>
-          {isRegistering ? 'Nuevo Registro' : 'Iglesia Central Monte Sinai'}
-        </h2>
+          Iglesia Central Monte Sinai
+        </h1>
+
         <p style={{ 
-          color: estilos.subtituloColor || '#a0aec0', 
-          fontSize: estilos.subtituloTamano || '14px', 
-          fontWeight: estilos.subtituloNegrita ? 'bold' : 'normal',
-          fontStyle: estilos.subtituloCursiva ? 'italic' : 'normal',
-          textAlign: 'center', 
-          marginBottom: '5px' 
+          color: estiloLogin.subtituloColor, 
+          fontSize: estiloLogin.subtituloTamano, 
+          fontWeight: estiloLogin.subtituloNegrita ? 'bold' : 'normal',
+          fontStyle: estiloLogin.subtituloCursiva ? 'italic' : 'normal',
+          textAlign: 'center',
+          marginBottom: '20px'
         }}>
-          {isRegistering ? 'El primer usuario registrado será Administrador' : 'Ingresa con tu usuario'}
+          {esRegistro ? 'Crea tu cuenta de acceso' : 'Inicia sesión con tu usuario'}
         </p>
 
-        {error && <p style={{ color: '#fc8181', fontSize: '14px', textAlign: 'center', margin: 0 }}>{error}</p>}
-
-        {isRegistering && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%' }}>
-            <label style={{ color: '#cbd5e0', fontSize: '14px' }}>Nombre completo</label>
-            <input 
-              type="text" 
-              value={nombre} 
-              onChange={(e) => setNombre(e.target.value)} 
-              required 
-              style={{ padding: '10px', borderRadius: '6px', border: '1px solid #4a5568', background: '#1a202c', color: '#fff', width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
+        {error && (
+          <p style={{ color: '#e53e3e', fontSize: '13px', textAlign: 'center', marginBottom: '15px' }}>
+            {error}
+          </p>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%' }}>
-          <label style={{ color: '#cbd5e0', fontSize: '14px' }}>Nombre de usuario</label>
-          <input 
-            type="text" 
-            placeholder="ej. pastor"
-            value={usuario} 
-            onChange={(e) => setUsuario(e.target.value)} 
-            required 
-            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #4a5568', background: '#1a202c', color: '#fff', width: '100%', boxSizing: 'border-box' }}
-          />
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          
+          {esRegistro && (
+            <div>
+              <label style={{ display: 'block', color: '#cbd5e0', fontSize: '14px', marginBottom: '5px' }}>
+                Nombre Completo
+              </label>
+              <input 
+                type="text" 
+                placeholder="Ej. Juan Pérez"
+                value={nombre} 
+                onChange={(e) => setNombre(e.target.value)} 
+                required={esRegistro}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #4a5568', 
+                  background: '#1a202c', 
+                  color: '#fff', 
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+              />
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: 'block', color: '#cbd5e0', fontSize: '14px', marginBottom: '5px' }}>
+              Usuario
+            </label>
+            <input 
+              type="text" 
+              placeholder="Ej. pastor"
+              value={identificador} 
+              onChange={(e) => setIdentificador(e.target.value)} 
+              required
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                borderRadius: '6px', 
+                border: '1px solid #4a5568', 
+                background: '#1a202c', 
+                color: '#fff', 
+                boxSizing: 'border-box',
+                outline: 'none'
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', color: '#cbd5e0', fontSize: '14px', marginBottom: '5px' }}>
+              Contraseña
+            </label>
+            <input 
+              type="password" 
+              placeholder="••••••••"
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              required
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                borderRadius: '6px', 
+                border: '1px solid #4a5568', 
+                background: '#1a202c', 
+                color: '#fff', 
+                boxSizing: 'border-box',
+                outline: 'none'
+              }}
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            style={{ 
+              background: estiloLogin.boton, 
+              color: '#fff', 
+              border: 'none', 
+              padding: '12px', 
+              borderRadius: '6px', 
+              fontWeight: 'bold', 
+              cursor: 'pointer',
+              marginTop: '10px' 
+            }}
+          >
+            {esRegistro ? 'Registrarse' : 'Iniciar Sesión'}
+          </button>
+        </form>
+
+        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <button 
+            onClick={() => { setEsRegistro(!esRegistro); setError(''); }}
+            style={{ background: 'none', border: 'none', color: '#90cdf4', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}
+          >
+            {esRegistro ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate aquí'}
+          </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%' }}>
-          <label style={{ color: '#cbd5e0', fontSize: '14px' }}>Contraseña (mínimo 6 caracteres)</label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #4a5568', background: '#1a202c', color: '#fff', width: '100%', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <button 
-          type="submit" 
-          disabled={cargando}
-          style={{ background: estilos.boton || '#3182ce', color: '#fff', padding: '12px', borderRadius: '6px', border: 'none', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', width: '100%' }}
-        >
-          {cargando ? 'Procesando...' : (isRegistering ? 'Registrarse' : 'Entrar')}
-        </button>
-
-        <button 
-          type="button" 
-          onClick={() => setIsRegistering(!isRegistering)}
-          style={{ background: 'transparent', color: '#63b3ed', border: 'none', cursor: 'pointer', fontSize: '14px', marginTop: '5px' }}
-        >
-          {isRegistering ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
-        </button>
-      </form>
+      </div>
     </div>
   );
 }

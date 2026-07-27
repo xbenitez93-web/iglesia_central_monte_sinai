@@ -19,12 +19,10 @@ export default function Miembros() {
         boton: '#3182ce', 
         fondo: '#1a202c', 
         tipografia: 'Inter, sans-serif',
-        // Título principal
         encabezadoColor: '#ffffff',
         encabezadoTamano: '24px',
         encabezadoNegrita: true,
         encabezadoCursiva: false,
-        // Subtítulo
         subtituloColor: '#a0aec0',
         subtituloTamano: '14px',
         subtituloNegrita: false,
@@ -58,6 +56,19 @@ export default function Miembros() {
       },
       finanzas: { 
         boton: '#e53e3e', 
+        fondo: '#1a202c', 
+        tipografia: 'Inter, sans-serif',
+        encabezadoColor: '#ffffff',
+        encabezadoTamano: '24px',
+        encabezadoNegrita: true,
+        encabezadoCursiva: false,
+        subtituloColor: '#a0aec0',
+        subtituloTamano: '14px',
+        subtituloNegrita: false,
+        subtituloCursiva: false
+      },
+      login: { 
+        boton: '#3182ce', 
         fondo: '#1a202c', 
         tipografia: 'Inter, sans-serif',
         encabezadoColor: '#ffffff',
@@ -159,13 +170,9 @@ export default function Miembros() {
     downloadAnchor.remove();
   };
 
-  // Función de guardado con notificación global para que las páginas se actualicen al instante
   const guardarPersonalizacion = () => {
     localStorage.setItem('congregacion360_estilos', JSON.stringify(configModulos));
-    
-    // Disparamos un evento personalizado para avisar a las demás páginas abiertas en la app
     window.dispatchEvent(new Event('estilosActualizados'));
-
     alert(`¡Estilos del módulo "${moduloSeleccionado.toUpperCase()}" guardados con éxito!`);
   };
 
@@ -295,7 +302,7 @@ export default function Miembros() {
         </div>
       )}
 
-      {/* PESTAÑA 5: PERSONALIZACIÓN CON TÍTULO, SUBTÍTULO, BOTONES Y FONDOS */}
+      {/* PESTAÑA 5: PERSONALIZACIÓN */}
       {subPestana === 'personalizacion' && (
         <div style={{ background: '#2d3748', padding: '20px', borderRadius: '8px', fontFamily: estiloActual.tipografia }}>
           <h3>Personalización Avanzada de Apariencia</h3>
@@ -305,6 +312,7 @@ export default function Miembros() {
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold', color: '#90cdf4' }}>Página / Módulo a configurar:</label>
             <select value={moduloSeleccionado} onChange={(e) => setModuloSeleccionado(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', background: '#1a202c', color: '#fff', border: '1px solid #4a5568', fontSize: '15px' }}>
+              <option value="login">Pantalla de Inicio de Sesión (Login)</option>
               <option value="directorio">Directorio de Miembros</option>
               <option value="agenda">Agenda y Calendario</option>
               <option value="cooperativa">Mini Cooperativa</option>
