@@ -226,10 +226,21 @@ export default function App() {
           )}
         </div>
 
-        <div className="drawer-footer">
-          <button className="drawer-item logout" onClick={() => signOut(auth)}>
+        <div className="drawer-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <button 
+            className="drawer-item logout" 
+            onClick={() => signOut(auth)}
+            style={{ width: '90%', justifyContent: 'center' }}
+          >
             <span className="icon">🚪</span> Cerrar Sesión
           </button>
+          
+          {/* Versión de la App centrada */}
+          <div style={{ marginTop: '10px', textAlign: 'center', width: '100%' }}>
+            <span style={{ fontSize: '12px', color: '#a0aec0' }}>
+              Versión de la App: <strong>1.0.0</strong>
+            </span>
+          </div>
         </div>
       </nav>
 

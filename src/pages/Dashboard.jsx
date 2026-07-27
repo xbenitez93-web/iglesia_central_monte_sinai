@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 export default function Dashboard() {
   const [ministerios, setMinisterios] = useState([]);
@@ -55,9 +56,36 @@ export default function Dashboard() {
     };
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
+  };
+
   return (
     <div style={{ padding: '20px', maxWidth: '1100px', margin: '0 auto', background: estilos.fondo || '#1a202c', minHeight: '80vh', fontFamily: estilos.tipografia || 'Inter, sans-serif', color: '#fff', borderRadius: '8px' }}>
       
+      {/* CABECERA CON BOTÓN DE CERRAR SESIÓN */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+        <button 
+          onClick={handleLogout}
+          style={{ 
+            background: '#e53e3e', 
+            color: '#fff', 
+            border: 'none', 
+            padding: '8px 15px', 
+            borderRadius: '6px', 
+            fontWeight: 'bold', 
+            cursor: 'pointer',
+            fontSize: '13px'
+          }}
+        >
+          Cerrar Sesión
+        </button>
+      </div>
+
       <h1 style={{ 
         color: estilos.encabezadoColor || '#ffffff', 
         fontSize: estilos.encabezadoTamano || '24px', 
