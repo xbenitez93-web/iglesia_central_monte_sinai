@@ -302,7 +302,7 @@ export default function Directorio() {
           fontStyle: estilos.encabezadoCursiva ? 'italic' : 'normal',
           marginBottom: '5px'
         }}>
-          Directorio de Miembros - Firebase
+          Directorio de Miembros
         </h1>
         <p style={{ 
           color: estilos.subtituloColor, 
@@ -364,6 +364,10 @@ export default function Directorio() {
                   onChange={(e) => { setFiltroNivel(e.target.value); setPaginaActual(1); }} 
                   style={{ ...inputStyle, padding: '10px' }}
                 >
+                  <input
+                  type="text" 
+                  placeholder="Filtrar por Nivel..." 
+                  ></input>
                   <option value="Todos">Filtrar por Nivel: Todos</option>
                   {listaNivelesCat.map(niv => (
                     <option key={niv} value={niv}>{niv}</option>
