@@ -364,10 +364,6 @@ export default function Directorio() {
                   onChange={(e) => { setFiltroNivel(e.target.value); setPaginaActual(1); }} 
                   style={{ ...inputStyle, padding: '10px' }}
                 >
-                  <input
-                  type="text" 
-                  placeholder="Filtrar por Nivel..." 
-                  ></input>
                   <option value="Todos">Filtrar por Nivel: Todos</option>
                   {listaNivelesCat.map(niv => (
                     <option key={niv} value={niv}>{niv}</option>
