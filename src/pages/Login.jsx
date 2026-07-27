@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -11,6 +11,39 @@ export default function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
+  const [estilos, setEstilos] = useState(() => {
+    const guardado = localStorage.getItem('congregacion360_estilos');
+    if (guardado) {
+      const parsed = JSON.parse(guardado);
+      return parsed.directorio || {};
+    }
+    return {
+      boton: '#3182ce',
+      fondo: '#1a202c',
+      tipografia: 'Inter, sans-serif',
+      encabezadoColor: '#ffffff',
+      encabezadoTamano: '24px',
+      encabezadoNegrita: true,
+      encabezadoCursiva: false,
+      subtituloColor: '#a0aec0',
+      subtituloTamano: '14px',
+      subtituloNegrita: false,
+      subtituloCursiva: false
+    };
+  });
+
+  useEffect(() => {
+    const actualizarEstilosLocales = () => {
+      const guardado = localStorage.getItem('congregacion360_estilos');
+      if (guardado) {
+        const parsed = JSON.parse(guardado);
+        if (parsed.directorio) setEstilos(parsed.directorio);
+      }
+    };
+    window.addEventListener('estilosActualizados', actualizarEstilosLocales);
+    return () => window.removeEventListener('estilosActualizados', actualizarEstilosLocales);
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setCargando(true);
@@ -20,20 +53,15 @@ export default function Login({ onLoginSuccess }) {
 
     try {
       if (isRegistering) {
-        // 1. Verificar si ya existe algún usuario registrado en la colección "usuarios"
         const querySnapshot = await getDocs(collection(db, "usuarios"));
-        const esElPrimerUsuario = querySnapshot.empty; // True si está vacío
-
-        // 2. Si es el primero, su rol será 'admin'. Si ya hay gente, será 'miembro'.
+        const esElPrimerUsuario = querySnapshot.empty;
         const rolAsignado = esElPrimerUsuario ? 'admin' : 'miembro';
 
         let user;
         try {
-          // 3. Intentar crear usuario en Firebase Auth
           const userCredential = await createUserWithEmailAndPassword(auth, emailFicticio, password);
           user = userCredential.user;
         } catch (authError) {
-          // Si el correo ya existe en Auth, intentamos iniciar sesión automáticamente
           if (authError.code === 'auth/email-already-in-use') {
             const loginCredential = await signInWithEmailAndPassword(auth, emailFicticio, password);
             user = loginCredential.user;
@@ -42,7 +70,6 @@ export default function Login({ onLoginSuccess }) {
           }
         }
 
-        // 4. Guardar en la colección "usuarios" en Firestore con el rol correspondiente
         await setDoc(doc(db, "usuarios", user.uid), {
           nombre: nombre,
           usuario: usuario.trim().toLowerCase(),
@@ -58,7 +85,6 @@ export default function Login({ onLoginSuccess }) {
 
         onLoginSuccess(user);
       } else {
-        // Iniciar sesión normal
         const userCredential = await signInWithEmailAndPassword(auth, emailFicticio, password);
         onLoginSuccess(userCredential.user);
       }
@@ -81,20 +107,33 @@ export default function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#1a202c', padding: '20px' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: estilos.fondo || '#1a202c', padding: '20px', fontFamily: estilos.tipografia || 'Inter, sans-serif' }}>
       <form onSubmit={handleSubmit} style={{ background: '#2d3748', padding: '30px', borderRadius: '10px', width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
         
-        {/* LOGOTIPO DE LA IGLESIA */}
         <img 
           src="/sinai_app.png" 
           alt="Iglesia Central Monte Sinai" 
           style={{ width: '130px', height: '130px', objectFit: 'contain', marginBottom: '5px' }} 
         />
 
-        <h2 style={{ color: '#fff', textAlign: 'center', marginBottom: '0' }}>
+        <h2 style={{ 
+          color: estilos.encabezadoColor || '#fff', 
+          fontSize: estilos.encabezadoTamano || '24px', 
+          fontWeight: estilos.encabezadoNegrita ? 'bold' : 'normal', 
+          fontStyle: estilos.encabezadoCursiva ? 'italic' : 'normal',
+          textAlign: 'center', 
+          marginBottom: '0' 
+        }}>
           {isRegistering ? 'Nuevo Registro' : 'Iglesia Central Monte Sinai'}
         </h2>
-        <p style={{ color: '#a0aec0', fontSize: '13px', textAlign: 'center', marginBottom: '5px' }}>
+        <p style={{ 
+          color: estilos.subtituloColor || '#a0aec0', 
+          fontSize: estilos.subtituloTamano || '14px', 
+          fontWeight: estilos.subtituloNegrita ? 'bold' : 'normal',
+          fontStyle: estilos.subtituloCursiva ? 'italic' : 'normal',
+          textAlign: 'center', 
+          marginBottom: '5px' 
+        }}>
           {isRegistering ? 'El primer usuario registrado será Administrador' : 'Ingresa con tu usuario'}
         </p>
 
@@ -139,7 +178,7 @@ export default function Login({ onLoginSuccess }) {
         <button 
           type="submit" 
           disabled={cargando}
-          style={{ background: '#3182ce', color: '#fff', padding: '12px', borderRadius: '6px', border: 'none', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', width: '100%' }}
+          style={{ background: estilos.boton || '#3182ce', color: '#fff', padding: '12px', borderRadius: '6px', border: 'none', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', width: '100%' }}
         >
           {cargando ? 'Procesando...' : (isRegistering ? 'Registrarse' : 'Entrar')}
         </button>

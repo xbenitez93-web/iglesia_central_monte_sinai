@@ -1,332 +1,288 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase'; 
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+// Importa aquí tu instancia o configuración de Firebase según corresponda
+// import { db } from '../firebaseConfig'; 
+// import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
-function Directorio() {
+export default function Directorio() {
+  // Estados de Personalización (Ajustes de Admin)
+  const [estilos, setEstilos] = useState({
+    boton: '#3182ce',
+    fondo: '#f0f2f5',
+    tipografia: 'sans-serif',
+    encabezadoColor: '#2d3748',
+    encabezadoTamano: '24px',
+    encabezadoNegrita: true,
+    encabezadoCursiva: false,
+    subtituloColor: '#4a5568',
+    subtituloTamano: '14px',
+    subtituloNegrita: false,
+    subtituloCursiva: false
+  });
+
+  const cargarEstilos = () => {
+    const guardado = localStorage.getItem('congregacion360_estilos');
+    if (guardado) {
+      const parsed = JSON.parse(guardado);
+      if (parsed.directorio) {
+        setEstilos(parsed.directorio);
+      }
+    }
+  };
+
+  useEffect(() => {
+    cargarEstilos(); // Cargar al abrir la página
+    window.addEventListener('estilosActualizados', cargarEstilos);
+    return () => {
+      window.removeEventListener('estilosActualizados', cargarEstilos);
+    };
+  }, []);
+
+  // Estado de Navegación Principal (Vistas)
+  const [vistaActiva, setVistaActiva] = useState('directorio');
+
+  // Estados principales de datos
   const [miembros, setMiembros] = useState([]);
-  const [usuariosApp, setUsuariosApp] = useState([]);
   const [cargandoDB, setCargandoDB] = useState(true);
 
-  const [listaMinisteriosCat, setListaMinisteriosCat] = useState([
-    'Alabanza', 'Ujieres', 'Escuela Dominical', 'Multimedia', 'Teatro', 'Grupo de crecimiento'
-  ]);
+  // Estados del formulario
+  const [editandoId, setEditandoId] = useState(null);
+  const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [email, setEmail] = useState('');
+  const [direccion, setDireccion] = useState('');
+  const [nacimiento, setNacimiento] = useState('');
+  const [conversion, setConversion] = useState('');
 
-  const [listaNivelesCat, setListaNivelesCat] = useState([
-    'Asistente', 'Miembro Activo', 'Bautizado', 'Servidor', 'Pastores'
-  ]);
+  // Estados de selección múltiple (Niveles y Ministerios)
+  const [nivelesSeleccionados, setNivelesSeleccionados] = useState({});
+  const [ministeriosSeleccionados, setMinisteriosSeleccionados] = useState({});
 
-  const [grupos, setGrupos] = useState([
-    {
-      id: 1,
-      nombre: 'Célula Esperanza',
-      lider: 'Carlos Gómez',
-      ubicacion: 'Col. Las Acacias, Casa #12',
-      dia: 'Miércoles 7:00 PM',
-      asistencias: []
-    }
-  ]);
-
+  // Filtros y Paginación
   const [busqueda, setBusqueda] = useState('');
   const [filtroNivel, setFiltroNivel] = useState('Todos');
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [editandoId, setEditandoId] = useState(null);
-  const [mostrarAdminCatalogos, setMostrarAdminCatalogos] = useState(false);
-  
-  const [mostrarSeccionCelulas, setMostrarSeccionCelulas] = useState(false);
-  const [nuevoNombreGrupo, setNuevoNombreGrupo] = useState('');
-  const [nuevoLiderGrupo, setNuevoLiderGrupo] = useState('');
-  const [nuevaUbicacionGrupo, setNuevaUbicacionGrupo] = useState('');
-  const [nuevoDiaGrupo, setNuevoDiaGrupo] = useState('');
-  
-  const [grupoSeleccionadoReporte, setGrupoSeleccionadoReporte] = useState(null);
-  const [fechaReunion, setFechaReunion] = useState('');
-  const [cantidadAsistentes, setCantidadAsistentes] = useState('');
-  const [notaReunion, setNotaReunion] = useState('');
-
-  const [nuevoMinCat, setNuevoMinCat] = useState('');
-  const [nuevoNivelCat, setNuevoNivelCat] = useState('');
-
   const [paginaActual, setPaginaActual] = useState(1);
   const elementosPorPagina = 6;
 
+  // Modal de Detalle / Notas Pastorales
   const [miembroSeleccionado, setMiembroSeleccionado] = useState(null);
   const [nuevaNota, setNuevaNota] = useState('');
 
-  const [nuevoNombre, setNuevoNombre] = useState('');
-  const [nuevoTelefono, setNuevoTelefono] = useState('');
-  const [nuevoEmail, setNuevoEmail] = useState('');
-  const [nuevaFechaNacimiento, setNuevaFechaNacimiento] = useState('');
-  const [nuevaFechaConversion, setNuevaFechaConversion] = useState('');
-  const [nuevaDireccion, setNuevaDireccion] = useState('');
+  // Estados específicos para Células y Asistencias
+  const [celulas, setCelulas] = useState([
+    { id: '1', nombre: 'Célula Central', lider: 'Carlos Gómez', dia: 'Miércoles', hora: '19:00', miembrosAsignados: [] },
+    { id: '2', nombre: 'Célula Norte', lider: 'María Rodríguez', dia: 'Jueves', hora: '18:30', miembrosAsignados: [] }
+  ]);
+  const [nombreNuevaCelula, setNombreNuevaCelula] = useState('');
+  const [liderNuevaCelula, setLiderNuevaCelula] = useState('');
+  const [diaCelula, setDiaCelula] = useState('Miércoles');
 
-  const [nivelesSeleccionados, setNivelesSeleccionados] = useState({});
-  const [ministeriosSeleccionados, setMinisteriosSeleccionados] = useState({});
+  // Estados específicos para Ajustes (Catálogos)
+  const [listaNivelesCat, setListaNivelesCat] = useState(['Bautizado', 'Líder', 'Discipulado', 'Miembro Activo']);
+  const [listaMinisteriosCat, setListaMinisteriosCat] = useState(['Alabanza', 'Ujieres', 'Escuela Dominical', 'Jóvenes', 'Intercesión', 'Diaconado']);
+  const [nuevoNivelCat, setNuevoNivelCat] = useState('');
+  const [nuevoMinisterioCat, setNuevoMinisterioCat] = useState('');
+  const [configFirebase, setConfigFirebase] = useState({ apiKey: '***', projectId: 'mi-iglesia-app' });
+
+  // Estados específicos para Exportar
+  const [formatoExportacion, setFormatoExportacion] = useState('csv');
+  const [incluirNotasPastorales, setIncluirNotasPastorales] = useState(true);
 
   const inputStyle = {
     width: '100%',
     padding: '10px',
     borderRadius: '6px',
     border: '1px solid #cbd5e0',
-    backgroundColor: '#ffffff',
-    color: '#2d3748',
+    fontSize: '0.9rem',
+    outline: 'none',
     boxSizing: 'border-box'
   };
 
-  // ==========================================
-  // SINCRONIZACIÓN CON FIREBASE (FIRESTORE)
-  // ==========================================
+  // Simulación de carga inicial desde Firebase
   useEffect(() => {
-    const obtenerDatosDeFirebase = async () => {
-      try {
-        // Cargar colección "miembros"
-        const queryMiembros = await getDocs(collection(db, "miembros"));
-        const listaMiembros = queryMiembros.docs.map(docu => ({ id: docu.id, ...docu.data() }));
-        setMiembros(listaMiembros);
-
-        setCargandoDB(false);
-      } catch (error) {
-        console.error("Error al cargar datos de Firebase:", error);
-        setCargandoDB(false);
-      }
-    };
-
-    obtenerDatosDeFirebase();
+    setCargandoDB(false);
   }, []);
 
-  const inicializarSelecciones = (nivelesActuales = [], minActuales = []) => {
-    const objNiv = {};
-    listaNivelesCat.forEach(n => { objNiv[n] = nivelesActuales.includes(n); });
-    setNivelesSeleccionados(objNiv);
-
-    const objMin = {};
-    listaMinisteriosCat.forEach(m => { objMin[m] = minActuales.includes(m); });
-    setMinisteriosSeleccionados(objMin);
-  };
-
-  const handleCheckboxNivel = (nivel) => {
-    setNivelesSeleccionados({ ...nivelesSeleccionados, [nivel]: !nivelesSeleccionados[nivel] });
+  const handleCheckboxNivel = (niv) => {
+    setNivelesSeleccionados(prev => ({ ...prev, [niv]: !prev[niv] }));
   };
 
   const handleCheckboxMinisterio = (min) => {
-    setMinisteriosSeleccionados({ ...ministeriosSeleccionados, [min]: !ministeriosSeleccionados[min] });
+    setMinisteriosSeleccionados(prev => ({ ...prev, [min]: !prev[min] }));
   };
 
   const limpiarFormulario = () => {
-    setNuevoNombre('');
-    setNuevoTelefono('');
-    setNuevoEmail('');
-    setNuevaFechaNacimiento('');
-    setNuevaFechaConversion('');
-    setNuevaDireccion('');
     setEditandoId(null);
-    setMostrarFormulario(false);
+    setNombre('');
+    setTelefono('');
+    setEmail('');
+    setDireccion('');
+    setNacimiento('');
+    setConversion('');
+    setNivelesSeleccionados({});
+    setMinisteriosSeleccionados({});
   };
 
-  const guardarMiembro = async (e) => {
+  const guardarMiembro = (e) => {
     e.preventDefault();
-    if (nuevoNombre.trim() === '') return;
+    const nivelesArr = Object.keys(nivelesSeleccionados).filter(k => nivelesSeleccionados[k]);
+    const ministeriosArr = Object.keys(ministeriosSeleccionados).filter(k => ministeriosSeleccionados[k]);
 
-    const listaNiveles = Object.keys(nivelesSeleccionados).filter((k) => nivelesSeleccionados[k]);
-    const listaMinisterios = Object.keys(ministeriosSeleccionados).filter((k) => ministeriosSeleccionados[k]);
-
-    const datosMiembro = {
-      nombre: nuevoNombre.trim(),
-      niveles: listaNiveles.length > 0 ? listaNiveles : ['Asistente'],
-      ministerios: listaMinisterios.length > 0 ? listaMinisterios : ['Ninguno'],
-      telefono: nuevoTelefono.trim() || 'Sin teléfono',
-      email: nuevoEmail.trim() || 'Sin correo',
-      nacimiento: nuevaFechaNacimiento || 'No registrada',
-      conversion: nuevaFechaConversion || 'No registrada',
-      direccion: nuevaDireccion.trim() || 'No especificada',
+    const nuevoRegistro = {
+      id: editandoId !== null ? editandoId : Date.now().toString(),
+      nombre,
+      telefono,
+      email,
+      direccion,
+      nacimiento,
+      conversion,
+      niveles: nivelesArr,
+      ministerios: ministeriosArr,
       notasPastorales: editandoId !== null ? (miembros.find(m => m.id === editandoId)?.notasPastorales || []) : []
     };
 
-    try {
-      if (editandoId !== null) {
-        const docRef = doc(db, "miembros", editandoId);
-        await updateDoc(docRef, datosMiembro);
-        setMiembros(miembros.map((m) => m.id === editandoId ? { ...m, ...datosMiembro } : m));
-      } else {
-        const docRef = await addDoc(collection(db, "miembros"), {
-          ...datosMiembro,
-          createdAt: serverTimestamp()
-        });
-        const nuevoRegistro = { id: docRef.id, ...datosMiembro };
-        setMiembros([nuevoRegistro, ...miembros]);
-      }
-
-      limpiarFormulario();
-    } catch (error) {
-      console.error("Error al guardar en la colección miembros:", error);
-      alert("Hubo un error al guardar el miembro en la base de datos.");
+    if (editandoId !== null) {
+      setMiembros(miembros.map(m => m.id === editandoId ? nuevoRegistro : m));
+    } else {
+      setMiembros([nuevoRegistro, ...miembros]);
     }
+    limpiarFormulario();
+    setVistaActiva('directorio');
   };
 
   const prepararEdicion = (m, e) => {
     e.stopPropagation();
     setEditandoId(m.id);
-    setNuevoNombre(m.nombre || '');
-    setNuevoTelefono(m.telefono === 'Sin teléfono' ? '' : m.telefono);
-    setNuevoEmail(m.email === 'Sin correo' ? '' : m.email);
-    setNuevaFechaNacimiento(m.nacimiento === 'No registrada' ? '' : m.nacimiento);
-    setNuevaFechaConversion(m.conversion === 'No registrada' ? '' : m.conversion);
-    setNuevaDireccion(m.direccion === 'No especificada' ? '' : m.direccion);
+    setNombre(m.nombre || '');
+    setTelefono(m.telefono || '');
+    setEmail(m.email || '');
+    setDireccion(m.direccion || '');
+    setNacimiento(m.nacimiento || '');
+    setConversion(m.conversion || '');
 
-    inicializarSelecciones(m.niveles || [], m.ministerios || []);
-    setMostrarFormulario(true);
+    const nivObj = {};
+    (m.niveles || []).forEach(n => nivObj[n] = true);
+    setNivelesSeleccionados(nivObj);
+
+    const minObj = {};
+    (m.ministerios || []).forEach(min => minObj[min] = true);
+    setMinisteriosSeleccionados(minObj);
+
+    setVistaActiva('nuevo');
   };
 
-  const abrirNuevoMiembro = () => {
-    limpiarFormulario();
-    inicializarSelecciones([], []);
-    setMostrarFormulario(true);
-  };
-
-  const eliminarMiembro = async (id, e) => {
+  const eliminarMiembro = (id, e) => {
     e.stopPropagation();
-    if (window.confirm('¿Estás seguro de eliminar esta ficha de vida de la colección miembros?')) {
-      try {
-        await deleteDoc(doc(db, "miembros", id));
-        setMiembros(miembros.filter(m => m.id !== id));
-        if (miembroSeleccionado?.id === id) setMiembroSeleccionado(null);
-      } catch (error) {
-        console.error("Error al eliminar en Firebase:", error);
-        alert("No se pudo eliminar el registro de la base de datos.");
-      }
+    if (window.confirm('¿Estás seguro de eliminar este miembro?')) {
+      setMiembros(miembros.filter(m => m.id !== id));
+      if (miembroSeleccionado?.id === id) setMiembroSeleccionado(null);
     }
   };
 
-  const agregarNotaPastoral = async (e) => {
+  const agregarNotaPastoral = (e) => {
     e.preventDefault();
     if (!nuevaNota.trim() || !miembroSeleccionado) return;
 
-    const notasActualizadas = [nuevaNota.trim(), ...(miembroSeleccionado.notasPastorales || [])];
-    
-    try {
-      await updateDoc(doc(db, "miembros", miembroSeleccionado.id), { notasPastorales: notasActualizadas });
-      const miembrosActualizados = miembros.map(m => m.id === miembroSeleccionado.id ? { ...m, notasPastorales: notasActualizadas } : m);
-      
-      setMiembros(miembrosActualizados);
-      setMiembroSeleccionado({ ...miembroSeleccionado, notasPastorales: notasActualizadas });
-      setNuevaNota('');
-    } catch (error) {
-      console.error("Error al guardar nota pastoral:", error);
-    }
+    const notasActualizadas = [nuevaNota, ...(miembroSeleccionado.notasPastorales || [])];
+    const miembroActualizado = { ...miembroSeleccionado, notasPastorales: notasActualizadas };
+
+    setMiembros(miembros.map(m => m.id === miembroActualizado.id ? miembroActualizado : m));
+    setMiembroSeleccionado(miembroActualizado);
+    setNuevaNota('');
   };
 
-  const agregarMinisterioCat = () => {
-    if (nuevoMinCat.trim() && !listaMinisteriosCat.includes(nuevoMinCat.trim())) {
-      setListaMinisteriosCat([...listaMinisteriosCat, nuevoMinCat.trim()]);
-      setNuevoMinCat('');
-    }
+  // Funciones de Células
+  const agregarCelula = (e) => {
+    e.preventDefault();
+    if (!nombreNuevaCelula.trim()) return;
+    const nueva = {
+      id: Date.now().toString(),
+      nombre: nombreNuevaCelula,
+      lider: liderNuevaCelula,
+      dia: diaCelula,
+      miembrosAsignados: []
+    };
+    setCelulas([...celulas, nueva]);
+    setNombreNuevaCelula('');
+    setLiderNuevaCelula('');
   };
 
-  const eliminarMinisterioCat = (min) => {
-    if (window.confirm(`¿Eliminar el ministerio "${min}" del catálogo?`)) {
-      setListaMinisteriosCat(listaMinisteriosCat.filter(m => m !== min));
-    }
-  };
-
-  const agregarNivelCat = () => {
-    if (nuevoNivelCat.trim() && !listaNivelesCat.includes(nuevoNivelCat.trim())) {
+  // Funciones de Ajustes (Catálogos)
+  const agregarNivelCat = (e) => {
+    e.preventDefault();
+    if (nuevoNivelCat.trim() && !listaNivelesCat.includes(nuevoNivelCat)) {
       setListaNivelesCat([...listaNivelesCat, nuevoNivelCat.trim()]);
       setNuevoNivelCat('');
     }
   };
 
-  const eliminarNivelCat = (niv) => {
-    if (window.confirm(`¿Eliminar el nivel "${niv}" del catálogo?`)) {
-      setListaNivelesCat(listaNivelesCat.filter(n => n !== niv));
+  const agregarMinisterioCat = (e) => {
+    e.preventDefault();
+    if (nuevoMinisterioCat.trim() && !listaMinisteriosCat.includes(nuevoMinisterioCat)) {
+      setListaMinisteriosCat([...listaMinisteriosCat, nuevoMinisterioCat.trim()]);
+      setNuevoMinisterioCat('');
     }
   };
 
-  const crearGrupoCrecimiento = (e) => {
-    e.preventDefault();
-    if (!nuevoNombreGrupo.trim()) return;
-    const nuevoGrupo = {
-      id: Date.now(),
-      nombre: nuevoNombreGrupo.trim(),
-      lider: nuevoLiderGrupo.trim() || 'Por asignar',
-      ubicacion: nuevaUbicacionGrupo.trim() || 'No especificada',
-      dia: nuevoDiaGrupo.trim() || 'Por definir',
-      asistencias: []
-    };
-    setGrupos([...grupos, nuevoGrupo]);
-    setNuevoNombreGrupo('');
-    setNuevoLiderGrupo('');
-    setNuevaUbicacionGrupo('');
-    setNuevoDiaGrupo('');
-  };
-
-  const eliminarGrupo = (id) => {
-    if (window.confirm('¿Estás seguro de eliminar este grupo de crecimiento?')) {
-      setGrupos(grupos.filter(g => g.id !== id));
-      if (grupoSeleccionadoReporte?.id === id) setGrupoSeleccionadoReporte(null);
-    }
-  };
-
-  const registrarAsistenciaCelula = (e) => {
-    e.preventDefault();
-    if (!grupoSeleccionadoReporte || !fechaReunion || !cantidadAsistentes) return;
-
-    const nuevaAsistencia = {
-      fecha: fechaReunion,
-      asistentes: parseInt(cantidadAsistentes, 10) || 0,
-      notas: notaReunion.trim() || 'Sin observaciones'
-    };
-
-    const gruposActualizados = grupos.map(g => {
-      if (g.id === grupoSeleccionadoReporte.id) {
-        const asisActualizadas = [nuevaAsistencia, ...(g.asistencias || [])];
-        return { ...g, asistencias: asisActualizadas };
-      }
-      return g;
-    });
-
-    setGrupos(gruposActualizados);
-    const grupoActualizado = gruposActualizados.find(g => g.id === grupoSeleccionadoReporte.id);
-    setGrupoSeleccionadoReporte(grupoActualizado);
-
-    setFechaReunion('');
-    setCantidadAsistentes('');
-    setNotaReunion('');
-  };
-
-  const exportarAExcel = () => {
-    if (miembrosFiltrados.length === 0) {
-      alert('No hay datos para exportar.');
+  // Función para Exportar Datos
+  const ejecutarExportacion = () => {
+    if (miembros.length === 0) {
+      alert('No hay miembros registrados para exportar.');
       return;
     }
-    const encabezados = ['Nombre', 'Compromisos', 'Ministerios', 'Teléfono', 'Email', 'Nacimiento', 'Conversión', 'Dirección'];
-    const filas = miembrosFiltrados.map(m => [
-      `"${m.nombre || ''}"`, 
-      `"${(m.niveles || []).join(', ')}"`, 
-      `"${(m.ministerios || []).join(', ')}"`,
-      `"${m.telefono || ''}"`, 
-      `"${m.email || ''}"`, 
-      `"${m.nacimiento || ''}"`, 
-      `"${m.conversion || ''}"`, 
-      `"${m.direccion || ''}"`
-    ]);
-    const contenidoCSV = [encabezados.join(','), ...filas.map(f => f.join(','))].join('\n');
-    const blob = new Blob(["\ufeff" + contenidoCSV], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const enlace = document.createElement('a');
-    enlace.href = url;
-    enlace.setAttribute('download', 'directorio_miembros.csv');
-    document.body.appendChild(enlace);
-    enlace.click();
-    document.body.removeChild(enlace);
+
+    if (formatoExportacion === 'csv') {
+      let csvContent = 'data:text/csv;charset=utf-8,';
+      csvContent += 'Nombre,Telefono,Email,Direccion,Nacimiento,Conversion,Niveles,Ministerios' + (incluirNotasPastorales ? ',NotasPastorales' : '') + '\r\n';
+
+      miembros.forEach(m => {
+        const nivelesStr = `"${(m.niveles || []).join(' - ')}"`;
+        const ministeriosStr = `"${(m.ministerios || []).join(' - ')}"`;
+        const notasStr = incluirNotasPastorales ? `"${(m.notasPastorales || []).join(' | ')}"` : '';
+
+        const row = [
+          `"${m.nombre || ''}"`,
+          `"${m.telefono || ''}"`,
+          `"${m.email || ''}"`,
+          `"${m.direccion || ''}"`,
+          `"${m.nacimiento || ''}"`,
+          `"${m.conversion || ''}"`,
+          nivelesStr,
+          ministeriosStr,
+          ...(incluirNotasPastorales ? [notasStr] : [])
+        ].join(',');
+
+        csvContent += row + '\r\n';
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', 'directorio_miembros.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(miembros, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "directorio_miembros.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
   };
 
-  const miembrosFiltrados = miembros.filter((m) => {
-    const nombreVal = m.nombre ? m.nombre.toLowerCase() : '';
-    const dirVal = m.direccion ? m.direccion.toLowerCase() : '';
-    const minVal = m.ministerios ? m.ministerios.some(min => min.toLowerCase().includes(busqueda.toLowerCase())) : false;
+  // Filtrado y Paginación
+  const miembrosFiltrados = miembros.filter(m => {
+    const textoBusqueda = busqueda.toLowerCase();
+    const coincideTexto = 
+      (m.nombre?.toLowerCase() || '').includes(textoBusqueda) ||
+      (m.direccion?.toLowerCase() || '').includes(textoBusqueda) ||
+      (m.ministerios || []).some(min => min.toLowerCase().includes(textoBusqueda));
 
-    const textoMatch = nombreVal.includes(busqueda.toLowerCase()) || dirVal.includes(busqueda.toLowerCase()) || minVal;
-    const nivelMatch = filtroNivel === 'Todos' || (m.niveles && m.niveles.includes(filtroNivel));
-    return textoMatch && nivelMatch;
+    const coincideNivel = filtroNivel === 'Todos' || (m.niveles || []).includes(filtroNivel);
+
+    return coincideTexto && coincideNivel;
   });
 
   const totalPaginas = Math.ceil(miembrosFiltrados.length / elementosPorPagina) || 1;
@@ -334,248 +290,194 @@ function Directorio() {
   const indexPrimero = indexUltimo - elementosPorPagina;
   const miembrosPaginados = miembrosFiltrados.slice(indexPrimero, indexUltimo);
 
-  const mesActual = new Date().getMonth() + 1;
-  const cumpleañerosDelMes = miembros.filter(m => {
-    if (!m.nacimiento || m.nacimiento === 'No registrada') return false;
-    const partesFecha = m.nacimiento.split('-');
-    return partesFecha.length === 3 && parseInt(partesFecha[1], 10) === mesActual;
-  });
-
   return (
-    <div style={{ padding: '40px', backgroundColor: '#f4f7f6', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+    <div style={{ background: estilos.fondo, fontFamily: estilos.tipografia, padding: '20px', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
-          <div>
-            <h1 style={{ color: '#0a0a0a', fontSize: '4.2rem', margin: '0 0 5px 0' }}>Directorio Inteligente & Células</h1>
-            <p style={{ color: '#718096', margin: 0 }}>Colección Firestore activa: <code>miembros</code></p>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button 
-              onClick={() => setMostrarSeccionCelulas(!mostrarSeccionCelulas)}
-              style={{ background: '#2b6cb0', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              {mostrarSeccionCelulas ? '🏠 Ver Directorio de Miembros' : '🌱 Gestionar Células y Asistencias'}
-            </button>
-            <button 
-              onClick={() => setMostrarAdminCatalogos(!mostrarAdminCatalogos)}
-              style={{ background: '#edf2f7', color: '#4a5568', border: '1px solid #cbd5e0', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              {mostrarAdminCatalogos ? 'Ocultar Ajustes' : '⚙️ Ajustes'}
-            </button>
-            <button 
-              onClick={exportarAExcel}
-              style={{ background: '#319795', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              📊 Exportar a Excel
-            </button>
-            <button 
-              onClick={() => { if (mostrarFormulario) limpiarFormulario(); else abrirNuevoMiembro(); }}
-              style={{ background: mostrarFormulario ? '#e53e3e' : '#3182ce', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              {mostrarFormulario ? 'Cancelar' : '+ Nueva Ficha de Miembro'}
-            </button>
-          </div>
-        </header>
+        {/* Título y Subtítulo dinámicos vinculados a la personalización */}
+        <h1 style={{ 
+          color: estilos.encabezadoColor, 
+          fontSize: estilos.encabezadoTamano, 
+          fontWeight: estilos.encabezadoNegrita ? 'bold' : 'normal',
+          fontStyle: estilos.encabezadoCursiva ? 'italic' : 'normal',
+          marginBottom: '5px'
+        }}>
+          Directorio de Miembros - Firebase
+        </h1>
+        <p style={{ 
+          color: estilos.subtituloColor, 
+          fontSize: estilos.subtituloTamano, 
+          fontWeight: estilos.subtituloNegrita ? 'bold' : 'normal',
+          fontStyle: estilos.subtituloCursiva ? 'italic' : 'normal',
+          marginBottom: '20px'
+        }}>
+          Visualiza y administra los datos de toda la congregación.
+        </p>
 
-        {mostrarSeccionCelulas && (
-          <div style={{ marginBottom: '30px' }}>
-            <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px', borderLeft: '4px solid #319795' }}>
-              <h2 style={{ margin: '0 0 15px 0', color: '#2d3748', fontSize: '1.4rem' }}>🌱 Registro y Alta de Nuevos Grupos de Crecimiento</h2>
-              <form onSubmit={crearGrupoCrecimiento} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px', alignItems: 'flex-end' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Nombre del Grupo *</label>
-                  <input type="text" placeholder="Ej. Célula El Shaddai" value={nuevoNombreGrupo} onChange={(e) => setNuevoNombreGrupo(e.target.value)} style={inputStyle} required />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Líder / Anfitrión</label>
-                  <input type="text" placeholder="Nombre del líder" value={nuevoLiderGrupo} onChange={(e) => setNuevoLiderGrupo(e.target.value)} style={inputStyle} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Ubicación / Dirección</label>
-                  <input type="text" placeholder="Dirección de la casa" value={nuevaUbicacionGrupo} onChange={(e) => setNuevaUbicacionGrupo(e.target.value)} style={inputStyle} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Día y Hora</label>
-                  <input type="text" placeholder="Ej. Jueves 7:00 PM" value={nuevoDiaGrupo} onChange={(e) => setNuevoDiaGrupo(e.target.value)} style={inputStyle} />
-                </div>
-                <div>
-                  <button type="submit" style={{ width: '100%', background: '#319795', color: '#fff', border: 'none', padding: '11px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                    + Crear Célula
-                  </button>
-                </div>
-              </form>
-            </div>
+        {/* Los 4 Botones de Navegación con Color Dinámico de Personalización */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px', marginBottom: '25px' }}>
+          <button 
+            onClick={() => setVistaActiva('celulas')}
+            style={{ padding: '14px 20px', background: vistaActiva === 'celulas' ? '#1a365d' : estilos.boton, color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transition: 'background 0.2s' }}
+          >
+            Gestionar Celulas y Asistencias
+          </button>
 
-            <h3 style={{ color: '#2d3748', marginBottom: '15px' }}>Listado de Células Activas y Reportes Semanales</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-              {grupos.map((g) => (
-                <div key={g.id} style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #319795', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <h3 style={{ margin: '0 0 5px 0', color: '#2d3748' }}>{g.nombre}</h3>
-                    <button onClick={() => eliminarGrupo(g.id)} title="Eliminar grupo" style={{ background: '#fff5f5', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}>🗑️</button>
-                  </div>
-                  <p style={{ margin: '0', fontSize: '0.9rem', color: '#4a5568' }}>👤 <strong>Líder:</strong> {g.lider}</p>
-                  <p style={{ margin: '0', fontSize: '0.9rem', color: '#4a5568' }}>📍 <strong>Ubicación:</strong> {g.ubicacion}</p>
-                  <p style={{ margin: '0', fontSize: '0.9rem', color: '#4a5568' }}>📅 <strong>Reunión:</strong> {g.dia}</p>
-                  <p style={{ margin: '0', fontSize: '0.85rem', color: '#718096' }}>📊 <strong>Total reportes:</strong> {(g.asistencias || []).length}</p>
-                  <button 
-                    onClick={() => setGrupoSeleccionadoReporte(g)}
-                    style={{ marginTop: '10px', background: '#e6fffa', color: '#234e52', border: '1px solid #b2f5ea', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
-                  >
-                    📝 Ver Historial y Reportar Asistencia
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          <button 
+            onClick={() => { limpiarFormulario(); setVistaActiva('nuevo'); }}
+            style={{ padding: '14px 20px', background: vistaActiva === 'nuevo' ? '#1a365d' : estilos.boton, color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transition: 'background 0.2s' }}
+          >
+            +Nueva Ficha del Miembro
+          </button>
 
-        {grupoSeleccionadoReporte && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
-            <div style={{ background: '#fff', width: '100%', maxWidth: '650px', borderRadius: '10px', padding: '25px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #edf2f7', paddingBottom: '12px', marginBottom: '15px' }}>
-                <h2 style={{ margin: 0, color: '#2d3748' }}>Reportes: {grupoSeleccionadoReporte.nombre}</h2>
-                <button onClick={() => setGrupoSeleccionadoReporte(null)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
-              </div>
+          <button 
+            onClick={() => setVistaActiva('exportar')}
+            style={{ padding: '14px 20px', background: vistaActiva === 'exportar' ? '#1a365d' : estilos.boton, color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transition: 'background 0.2s' }}
+          >
+            Exportar a Excel
+          </button>
 
-              <form onSubmit={registrarAsistenciaCelula} style={{ background: '#f7fafc', padding: '15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <h4 style={{ margin: '0 0 5px 0', color: '#2d3748' }}>Registrar Asistencia Semanal</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#4a5568', marginBottom: '4px' }}>Fecha de Reunión *</label>
-                    <input type="date" value={fechaReunion} onChange={(e) => setFechaReunion(e.target.value)} style={inputStyle} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#4a5568', marginBottom: '4px' }}>Asistentes (Cantidad) *</label>
-                    <input type="number" min="1" placeholder="Ej. 12" value={cantidadAsistentes} onChange={(e) => setCantidadAsistentes(e.target.value)} style={inputStyle} required />
-                  </div>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#4a5568', marginBottom: '4px' }}>Notas o Comentarios</label>
-                  <input type="text" placeholder="Ej. Buen tiempo de alabanza..." value={notaReunion} onChange={(e) => setNotaReunion(e.target.value)} style={inputStyle} />
-                </div>
-                <button type="submit" style={{ background: '#319795', color: '#fff', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                  Guardar Reporte Semanal
-                </button>
-              </form>
-
-              <h4 style={{ margin: '0 0 10px 0', color: '#2d3748' }}>📋 Historial de Asistencias</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                {(!grupoSeleccionadoReporte.asistencias || grupoSeleccionadoReporte.asistencias.length === 0) ? (
-                  <p style={{ color: '#a0aec0', fontSize: '0.85rem', fontStyle: 'italic', margin: 0 }}>No hay reportes semanales registrados.</p>
-                ) : (
-                  grupoSeleccionadoReporte.asistencias.map((asis, idx) => (
-                    <div key={idx} style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontWeight: 'bold', color: '#2d3748', fontSize: '0.9rem' }}>📅 {asis.fecha}</span>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#718096' }}>{asis.notas}</p>
-                      </div>
-                      <span style={{ background: '#e6fffa', color: '#234e52', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                        👥 {asis.asistentes} asistentes
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {mostrarAdminCatalogos && (
-          <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '25px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', borderLeft: '4px solid #3182ce' }}>
-            <div>
-              <h3 style={{ margin: '0 0 10px 0', color: '#2d3748', fontSize: '1.1rem' }}>Catálogo de Ministerios</h3>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <input type="text" placeholder="Nuevo ministerio..." value={nuevoMinCat} onChange={(e) => setNuevoMinCat(e.target.value)} style={inputStyle} />
-                <button onClick={agregarMinisterioCat} style={{ background: '#3182ce', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Agregar</button>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {listaMinisteriosCat.map((min) => (
-                  <span key={min} style={{ background: '#ebf8ff', color: '#2b6cb0', padding: '4px 10px', borderRadius: '15px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #bee3f8' }}>
-                    {min}
-                    <button onClick={() => eliminarMinisterioCat(min)} style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>×</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 style={{ margin: '0 0 10px 0', color: '#2d3748', fontSize: '1.1rem' }}>Catálogo de Niveles</h3>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <input type="text" placeholder="Nuevo nivel..." value={nuevoNivelCat} onChange={(e) => setNuevoNivelCat(e.target.value)} style={inputStyle} />
-                <button onClick={agregarNivelCat} style={{ background: '#3182ce', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Agregar</button>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {listaNivelesCat.map((niv) => (
-                  <span key={niv} style={{ background: '#e6fffa', color: '#234e52', padding: '4px 10px', borderRadius: '15px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #b2f5ea' }}>
-                    {niv}
-                    <button onClick={() => eliminarNivelCat(niv)} style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>×</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #d53f8c', marginBottom: '25px' }}>
-          <h3 style={{ margin: '0 0 10px 0', color: '#2d3748', fontSize: '1.1rem' }}>🎂 Cumpleaños del Mes en Curso</h3>
-          {cumpleañerosDelMes.length === 0 ? (
-            <p style={{ margin: 0, color: '#718096', fontSize: '0.9rem' }}>No hay miembros registrados que cumplan años este mes.</p>
-          ) : (
-            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '10px' }}>
-              {cumpleañerosDelMes.map(c => {
-                const telefonoLimpio = c.telefono ? c.telefono.replace(/\D/g, '') : '';
-                const linkWhatsapp = telefonoLimpio.length >= 7 ? `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(`¡Hola ${c.nombre}! De parte de la iglesia te deseamos un muy feliz cumpleaños. ¡Bendiciones!`)}` : '#';
-                return (
-                  <div key={c.id} style={{ background: '#fff5f7', border: '1px solid #fed7e2', padding: '10px 14px', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '200px' }}>
-                    <span style={{ fontWeight: 'bold', color: '#97266d', fontSize: '0.9rem' }}>{c.nombre}</span>
-                    <span style={{ color: '#718096', fontSize: '0.8rem' }}>📅 {c.nacimiento}</span>
-                    {telefonoLimpio.length >= 7 && (
-                      <a href={linkWhatsapp} target="_blank" rel="noopener noreferrer" style={{ background: '#25d366', color: '#fff', textDecoration: 'none', padding: '4px 8px', borderRadius: '4px', textAlign: 'center', fontSize: '0.75rem', fontWeight: 'bold', marginTop: '4px' }}>
-                        💬 WhatsApp
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <button 
+            onClick={() => setVistaActiva('ajustes')}
+            style={{ padding: '14px 20px', background: vistaActiva === 'ajustes' ? '#1a365d' : estilos.boton, color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transition: 'background 0.2s' }}
+          >
+            Ajustes
+          </button>
         </div>
 
-        {mostrarFormulario && (
-          <form onSubmit={guardarMiembro} style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', marginBottom: '30px' }}>
-            <h3 style={{ margin: '0 0 20px 0', color: '#2d3748' }}>{editandoId !== null ? 'Editar Ficha de Vida' : 'Crear Ficha de Vida (Colección: miembros)'}</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px', marginBottom: '20px' }}>
+        {/* SECCIÓN 1: VISTA DIRECTORIO */}
+        {vistaActiva === 'directorio' && (
+          <>
+            <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ flex: '1', minWidth: '250px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Buscar por nombre, dirección o ministerio..." 
+                  value={busqueda} 
+                  onChange={(e) => { setBusqueda(e.target.value); setPaginaActual(1); }} 
+                  style={inputStyle} 
+                />
+              </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Nombre completo *</label>
-                <input type="text" value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} style={inputStyle} required />
+                <select 
+                  value={filtroNivel} 
+                  onChange={(e) => { setFiltroNivel(e.target.value); setPaginaActual(1); }} 
+                  style={{ ...inputStyle, padding: '10px' }}
+                >
+                  <option value="Todos">Filtrar por Nivel: Todos</option>
+                  {listaNivelesCat.map(niv => (
+                    <option key={niv} value={niv}>{niv}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {cargandoDB ? (
+              <p style={{ textAlign: 'center', color: '#718096', padding: '40px' }}>Cargando directorio desde Firebase...</p>
+            ) : miembrosFiltrados.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#718096', padding: '40px' }}>No se encontraron registros en la colección <code>miembros</code>.</p>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px', marginBottom: '25px' }}>
+                  {miembrosPaginados.map((m) => (
+                    <div 
+                      key={m.id} 
+                      onClick={() => setMiembroSeleccionado(m)}
+                      style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: `4px solid ${estilos.boton}`, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '8px' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <h3 style={{ margin: '0 0 5px 0', color: '#2d3748', fontSize: '1.1rem' }}>{m.nombre}</h3>
+                        <div style={{ display: 'flex', gap: '5px' }} onClick={(e) => e.stopPropagation()}>
+                          <button onClick={(e) => prepararEdicion(m, e)} title="Editar" style={{ background: '#ebf8ff', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}>✏️</button>
+                          <button onClick={(e) => eliminarMiembro(m.id, e)} title="Eliminar" style={{ background: '#fff5f5', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}>🗑️</button>
+                        </div>
+                      </div>
+                      <p style={{ margin: '0', fontSize: '0.85rem', color: '#4a5568' }}>📞 <strong>Teléfono:</strong> {m.telefono}</p>
+                      <p style={{ margin: '0', fontSize: '0.85rem', color: '#4a5568' }}>✉️ <strong>Email:</strong> {m.email}</p>
+                      <p style={{ margin: '0', fontSize: '0.85rem', color: '#4a5568' }}>📍 <strong>Dirección:</strong> {m.direccion}</p>
+                      
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                        {(m.niveles || []).map((niv, i) => (
+                          <span key={i} style={{ background: '#e6fffa', color: '#234e52', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>{niv}</span>
+                        ))}
+                        {(m.ministerios || []).map((min, i) => (
+                          <span key={i} style={{ background: '#ebf8ff', color: '#2b6cb0', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>{min}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {totalPaginas > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
+                    <button 
+                      disabled={paginaActual === 1}
+                      onClick={() => setPaginaActual(prev => Math.max(prev - 1, 1))}
+                      style={{ padding: '8px 12px', background: paginaActual === 1 ? '#edf2f7' : '#fff', border: '1px solid #cbd5e0', borderRadius: '4px', cursor: paginaActual === 1 ? 'not-allowed' : 'pointer' }}
+                    >
+                      Anterior
+                    </button>
+                    <span style={{ fontSize: '0.9rem', color: '#4a5568' }}>Página {paginaActual} de {totalPaginas}</span>
+                    <button 
+                      disabled={paginaActual === totalPaginas}
+                      onClick={() => setPaginaActual(prev => Math.min(prev + 1, totalPaginas))}
+                      style={{ padding: '8px 12px', background: paginaActual === totalPaginas ? '#edf2f7' : '#fff', border: '1px solid #cbd5e0', borderRadius: '4px', cursor: paginaActual === totalPaginas ? 'not-allowed' : 'pointer' }}
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* SECCIÓN 2: FORMULARIO NUEVA FICHA / EDICIÓN */}
+        {vistaActiva === 'nuevo' && (
+          <form onSubmit={guardarMiembro} style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.2rem' }}>
+                {editandoId !== null ? '✏️ Actualizar Ficha de Miembro' : '➕ Registrar Nueva Ficha del Miembro'}
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => { limpiarFormulario(); setVistaActiva('directorio'); }}
+                style={{ background: 'none', border: 'none', fontSize: '1.1rem', cursor: 'pointer', color: '#718096' }}
+              >
+                ✕ Volver al Directorio
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Nombre completo</label>
+                <input type="text" placeholder="Ej. Juan Pérez" value={nombre} onChange={(e) => setNombre(e.target.value)} required style={inputStyle} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Teléfono</label>
-                <input type="text" value={nuevoTelefono} onChange={(e) => setNuevoTelefono(e.target.value)} style={inputStyle} />
+                <input type="text" placeholder="Ej. +504 0000-0000" value={telefono} onChange={(e) => setTelefono(e.target.value)} style={inputStyle} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Correo electrónico</label>
-                <input type="email" value={nuevoEmail} onChange={(e) => setNuevoEmail(e.target.value)} style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Fecha de Nacimiento</label>
-                <input type="date" value={nuevaFechaNacimiento} onChange={(e) => setNuevaFechaNacimiento(e.target.value)} style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Fecha de Conversión</label>
-                <input type="date" value={nuevaFechaConversion} onChange={(e) => setNuevaFechaConversion(e.target.value)} style={inputStyle} />
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Correo Electrónico</label>
+                <input type="email" placeholder="correo@ejemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Dirección</label>
-                <input type="text" value={nuevaDireccion} onChange={(e) => setNuevaDireccion(e.target.value)} style={inputStyle} />
+                <input type="text" placeholder="Colonia, calle, casa" value={direccion} onChange={(e) => setDireccion(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Fecha de Nacimiento</label>
+                <input type="text" placeholder="DD/MM/AAAA" value={nacimiento} onChange={(e) => setNacimiento(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Fecha de Conversión</label>
+                <input type="text" placeholder="DD/MM/AAAA" value={conversion} onChange={(e) => setConversion(e.target.value)} style={inputStyle} />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
               <div style={{ background: '#f7fafc', padding: '15px', borderRadius: '6px' }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: '#2d3748' }}>Niveles de Compromiso</h4>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: '#2d3748' }}>Niveles / Compromisos</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {listaNivelesCat.map((niv) => (
                     <label key={niv} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#4a5568', cursor: 'pointer' }}>
@@ -607,159 +509,237 @@ function Directorio() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" onClick={limpiarFormulario} style={{ background: '#edf2f7', color: '#4a5568', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                Cancelar
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="submit" style={{ background: estilos.boton, color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+                {editandoId !== null ? 'Actualizar Ficha' : 'Guardar Miembro'}
               </button>
-              <button type="submit" style={{ background: '#3182ce', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                {editandoId !== null ? 'Guardar Cambios' : 'Registrar Miembro'}
+              <button type="button" onClick={() => { limpiarFormulario(); setVistaActiva('directorio'); }} style={{ background: '#e2e8f0', color: '#4a5568', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Cancelar
               </button>
             </div>
           </form>
         )}
 
-        <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-          <input 
-            type="text" 
-            placeholder="🔍 Buscar por nombre, dirección o ministerio..." 
-            value={busqueda} 
-            onChange={(e) => { setBusqueda(e.target.value); setPaginaActual(1); }} 
-            style={{ ...inputStyle, flex: '1', minWidth: '250px' }} 
-          />
-          <select 
-            value={filtroNivel} 
-            onChange={(e) => { setFiltroNivel(e.target.value); setPaginaActual(1); }} 
-            style={{ ...inputStyle, width: '200px' }}
-          >
-            <option value="Todos">Todos los niveles</option>
-            {listaNivelesCat.map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
+        {/* SECCIÓN 3: GESTIONAR CÉLULAS Y ASISTENCIAS */}
+        {vistaActiva === 'celulas' && (
+          <div style={{ background: '#fff', padding: '30px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, color: '#2d3748' }}>🏡 Gestión de Células y Asistencias</h3>
+              <button 
+                onClick={() => setVistaActiva('directorio')}
+                style={{ background: '#e2e8f0', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#4a5568' }}
+              >
+                Volver al Directorio
+              </button>
+            </div>
+            
+            <p style={{ color: '#4a5568', fontSize: '0.95rem', marginBottom: '20px' }}>
+              Aquí puedes registrar grupos celulares y llevar el control de asistencias semanales.
+            </p>
 
-        <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-              <thead>
-                <tr style={{ background: '#edf2f7', color: '#4a5568', borderBottom: '1px solid #cbd5e0' }}>
-                  <th style={{ padding: '12px 15px' }}>Nombre</th>
-                  <th style={{ padding: '12px 15px' }}>Niveles</th>
-                  <th style={{ padding: '12px 15px' }}>Ministerios</th>
-                  <th style={{ padding: '12px 15px' }}>Teléfono</th>
-                  <th style={{ padding: '12px 15px' }}>Dirección</th>
-                  <th style={{ padding: '12px 15px', textAlign: 'center' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cargandoDB ? (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#718096' }}>Cargando registros de la base de datos...</td>
-                  </tr>
-                ) : miembrosPaginados.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#718096' }}>No se encontraron registros en la colección miembros.</td>
-                  </tr>
-                ) : (
-                  miembrosPaginados.map((m) => (
-                    <tr 
-                      key={m.id} 
-                      onClick={() => setMiembroSeleccionado(m)} 
-                      style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer', transition: 'background 0.2s' }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f7fafc'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <td style={{ padding: '12px 15px', fontWeight: 'bold', color: '#2d3748' }}>{m.nombre}</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {(m.niveles || []).map(niv => (
-                            <span key={niv} style={{ background: '#e6fffa', color: '#234e52', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>{niv}</span>
-                          ))}
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {(m.ministerios || []).map(min => (
-                            <span key={min} style={{ background: '#ebf8ff', color: '#2b6cb0', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>{min}</span>
-                          ))}
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', color: '#4a5568' }}>{m.telefono}</td>
-                      <td style={{ padding: '12px 15px', color: '#4a5568' }}>{m.direccion}</td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                          <button onClick={(e) => prepararEdicion(m, e)} title="Editar" style={{ background: '#ebf8ff', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer' }}>✏️</button>
-                          <button onClick={(e) => eliminarMiembro(m.id, e)} title="Eliminar" style={{ background: '#fff5f5', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer' }}>🗑️</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <form onSubmit={agregarCelula} style={{ background: '#f7fafc', padding: '20px', borderRadius: '8px', marginBottom: '25px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ flex: '1', minWidth: '200px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Nombre de Célula</label>
+                <input type="text" placeholder="Ej. Célula El Redentor" value={nombreNuevaCelula} onChange={(e) => setNombreNuevaCelula(e.target.value)} required style={inputStyle} />
+              </div>
+              <div style={{ flex: '1', minWidth: '200px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Líder Encargado</label>
+                <input type="text" placeholder="Nombre del líder" value={liderNuevaCelula} onChange={(e) => setLiderNuevaCelula(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#4a5568', marginBottom: '5px' }}>Día de Reunión</label>
+                <select value={diaCelula} onChange={(e) => setDiaCelula(e.target.value)} style={{ ...inputStyle, padding: '10px' }}>
+                  <option value="Lunes">Lunes</option>
+                  <option value="Martes">Martes</option>
+                  <option value="Miércoles">Miércoles</option>
+                  <option value="Jueves">Jueves</option>
+                  <option value="Viernes">Viernes</option>
+                  <option value="Sábado">Sábado</option>
+                  <option value="Domingo">Domingo</option>
+                </select>
+              </div>
+              <button type="submit" style={{ background: estilos.boton, color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>
+                + Agregar Célula
+              </button>
+            </form>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
+              {celulas.map((c) => (
+                <div key={c.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '15px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                  <h4 style={{ margin: '0 0 8px 0', color: '#2d3748' }}>{c.nombre}</h4>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#4a5568' }}>👤 <strong>Líder:</strong> {c.lider || 'No asignado'}</p>
+                  <p style={{ margin: '0 0 15px 0', fontSize: '0.85rem', color: '#4a5568' }}>📅 <strong>Día:</strong> {c.dia}</p>
+                  <button 
+                    onClick={() => alert(`Abriendo control de asistencia para: ${c.nombre}`)}
+                    style={{ width: '100%', background: '#edf2f7', border: '1px solid #cbd5e0', color: '#2d3748', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
+                  >
+                    📋 Pasar Asistencia
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
+        )}
 
-          {totalPaginas > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderTop: '1px solid #edf2f7' }}>
-              <span style={{ fontSize: '0.85rem', color: '#718096' }}>Página {paginaActual} de {totalPaginas}</span>
-              <div style={{ display: 'flex', gap: '5px' }}>
-                <button 
-                  onClick={() => setPaginaActual(p => Math.max(p - 1, 1))} 
-                  disabled={paginaActual === 1}
-                  style={{ background: '#edf2f7', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: paginaActual === 1 ? 'not-allowed' : 'pointer', opacity: paginaActual === 1 ? 0.5 : 1 }}
-                >
-                  Anterior
-                </button>
-                <button 
-                  onClick={() => setPaginaActual(p => Math.min(p + 1, totalPaginas))} 
-                  disabled={paginaActual === totalPaginas}
-                  style={{ background: '#edf2f7', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: paginaActual === totalPaginas ? 'not-allowed' : 'pointer', opacity: paginaActual === totalPaginas ? 0.5 : 1 }}
-                >
-                  Siguiente
-                </button>
+        {/* SECCIÓN 4: EXPORTAR A EXCEL */}
+        {vistaActiva === 'exportar' && (
+          <div style={{ background: '#fff', padding: '30px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, color: '#2d3748' }}>📊 Exportar Datos del Directorio</h3>
+              <button 
+                onClick={() => setVistaActiva('directorio')}
+                style={{ background: '#e2e8f0', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#4a5568' }}
+              >
+                Volver al Directorio
+              </button>
+            </div>
+
+            <p style={{ color: '#4a5568', fontSize: '0.95rem', marginBottom: '20px' }}>
+              Selecciona el formato de exportación para descargar la base de datos completa de los miembros registrados.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '25px' }}>
+              <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#2d3748' }}>Formato de Archivo</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: '#4a5568', cursor: 'pointer' }}>
+                    <input 
+                      type="radio" 
+                      name="formato" 
+                      checked={formatoExportacion === 'csv'} 
+                      onChange={() => setFormatoExportacion('csv')} 
+                    />
+                    CSV / Excel (.csv)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: '#4a5568', cursor: 'pointer' }}>
+                    <input 
+                      type="radio" 
+                      name="formato" 
+                      checked={formatoExportacion === 'json'} 
+                      onChange={() => setFormatoExportacion('json')} 
+                    />
+                    Respaldo Completo (.json)
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#2d3748' }}>Opciones Adicionales</h4>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: '#4a5568', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={incluirNotasPastorales} 
+                    onChange={(e) => setIncluirNotasPastorales(e.target.checked)} 
+                  />
+                  Incluir notas pastorales en el reporte
+                </label>
               </div>
             </div>
-          )}
-        </div>
 
+            <button 
+              onClick={ejecutarExportacion} 
+              style={{ background: '#276749', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
+            >
+              📥 Descargar Reporte de Miembros
+            </button>
+          </div>
+        )}
+
+        {/* SECCIÓN 5: AJUSTES */}
+        {vistaActiva === 'ajustes' && (
+          <div style={{ background: '#fff', padding: '30px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, color: '#2d3748' }}>⚙️ Ajustes del Sistema y Catálogos</h3>
+              <button 
+                onClick={() => setVistaActiva('directorio')}
+                style={{ background: '#e2e8f0', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#4a5568' }}
+              >
+                Volver al Directorio
+              </button>
+            </div>
+
+            <p style={{ color: '#4a5568', fontSize: '0.95rem', marginBottom: '20px' }}>
+              Administra los niveles de compromiso y los ministerios disponibles en los formularios de registro de miembros.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '25px' }}>
+              
+              {/* Catálogo de Niveles */}
+              <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#2d3748' }}>Niveles / Compromisos</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '15px' }}>
+                  {listaNivelesCat.map((niv, i) => (
+                    <span key={i} style={{ background: '#e6fffa', color: '#234e52', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>{niv}</span>
+                  ))}
+                </div>
+                <form onSubmit={agregarNivelCat} style={{ display: 'flex', gap: '8px' }}>
+                  <input type="text" placeholder="Nuevo nivel..." value={nuevoNivelCat} onChange={(e) => setNuevoNivelCat(e.target.value)} style={inputStyle} />
+                  <button type="submit" style={{ background: estilos.boton, color: '#fff', border: 'none', padding: '0 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
+                </form>
+              </div>
+
+              {/* Catálogo de Ministerios */}
+              <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#2d3748' }}>Ministerios</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '15px' }}>
+                  {listaMinisteriosCat.map((min, i) => (
+                    <span key={i} style={{ background: '#ebf8ff', color: '#2b6cb0', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>{min}</span>
+                  ))}
+                </div>
+                <form onSubmit={agregarMinisterioCat} style={{ display: 'flex', gap: '8px' }}>
+                  <input type="text" placeholder="Nuevo ministerio..." value={nuevoMinisterioCat} onChange={(e) => setNuevoMinisterioCat(e.target.value)} style={inputStyle} />
+                  <button type="submit" style={{ background: estilos.boton, color: '#fff', border: 'none', padding: '0 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
+                </form>
+              </div>
+
+            </div>
+
+            <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#2d3748' }}>Configuración de Base de Datos (Firebase)</h4>
+              <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#718096' }}>Proyecto conectado actualmente: <strong>{configFirebase.projectId}</strong></p>
+              <button onClick={() => alert('Parámetros de conexión actualizados')} style={{ background: estilos.boton, color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                Ver Parámetros de Conexión
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Ficha de Vida y Notas Pastorales */}
         {miembroSeleccionado && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
             <div style={{ background: '#fff', width: '100%', maxWidth: '600px', borderRadius: '10px', padding: '25px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #edf2f7', paddingBottom: '12px', marginBottom: '15px' }}>
-                <h2 style={{ margin: 0, color: '#2d3748' }}>Ficha Pastoral: {miembroSeleccionado.nombre}</h2>
+                <h2 style={{ margin: 0, color: '#2d3748' }}>Ficha de Vida: {miembroSeleccionado.nombre}</h2>
                 <button onClick={() => setMiembroSeleccionado(null)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px', fontSize: '0.9rem', color: '#4a5568', background: '#f7fafc', padding: '12px', borderRadius: '6px' }}>
-                <div>📞 <strong>Teléfono:</strong> {miembroSeleccionado.telefono}</div>
-                <div>📧 <strong>Email:</strong> {miembroSeleccionado.email}</div>
-                <div>🎂 <strong>Nacimiento:</strong> {miembroSeleccionado.nacimiento}</div>
-                <div>🕊️ <strong>Conversión:</strong> {miembroSeleccionado.conversion}</div>
-                <div style={{ gridColumn: 'span 2' }}>📍 <strong>Dirección:</strong> {miembroSeleccionado.direccion}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px', fontSize: '0.9rem', color: '#4a5568' }}>
+                <p style={{ margin: 0 }}>📞 <strong>Teléfono:</strong> {miembroSeleccionado.telefono}</p>
+                <p style={{ margin: 0 }}>✉️ <strong>Email:</strong> {miembroSeleccionado.email}</p>
+                <p style={{ margin: 0 }}>🎂 <strong>Nacimiento:</strong> {miembroSeleccionado.nacimiento}</p>
+                <p style={{ margin: 0 }}>✝️ <strong>Conversión:</strong> {miembroSeleccionado.conversion}</p>
+                <p style={{ margin: 0, gridColumn: 'span 2' }}>📍 <strong>Dirección:</strong> {miembroSeleccionado.direccion}</p>
               </div>
 
-              <form onSubmit={agregarNotaPastoral} style={{ marginBottom: '20px' }}>
-                <h4 style={{ margin: '0 0 8px 0', color: '#2d3748' }}>Agregar Nota Pastoral / Seguimiento</h4>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input 
-                    type="text" 
-                    placeholder="Escribe una observación o nota pastoral..." 
-                    value={nuevaNota} 
-                    onChange={(e) => setNuevaNota(e.target.value)} 
-                    style={inputStyle} 
-                  />
-                  <button type="submit" style={{ background: '#3182ce', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                    Guardar
-                  </button>
-                </div>
+              <h3 style={{ color: '#2d3748', fontSize: '1rem', marginBottom: '10px' }}>📝 Notas Pastorales</h3>
+              <form onSubmit={agregarNotaPastoral} style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Escribir nueva nota pastoral..." 
+                  value={nuevaNota} 
+                  onChange={(e) => setNuevaNota(e.target.value)} 
+                  style={inputStyle} 
+                />
+                <button type="submit" style={{ background: estilos.boton, color: '#fff', border: 'none', padding: '0 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Agregar</button>
               </form>
 
-              <h4 style={{ margin: '0 0 10px 0', color: '#2d3748' }}>📝 Historial de Notas Pastorales</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                 {(!miembroSeleccionado.notasPastorales || miembroSeleccionado.notasPastorales.length === 0) ? (
                   <p style={{ color: '#a0aec0', fontSize: '0.85rem', fontStyle: 'italic', margin: 0 }}>No hay notas pastorales registradas para este miembro.</p>
                 ) : (
-                  miembroSeleccionado.notasPastorales.map((nota, idx) => (
-                    <div key={idx} style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.9rem', color: '#2d3748' }}>
-                      • {nota}
+                  miembroSeleccionado.notasPastorales.map((nota, index) => (
+                    <div key={index} style={{ background: '#f7fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#2d3748' }}>
+                      {nota}
                     </div>
                   ))
                 )}
@@ -772,5 +752,3 @@ function Directorio() {
     </div>
   );
 }
-
-export default Directorio;

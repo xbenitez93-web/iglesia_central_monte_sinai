@@ -77,7 +77,7 @@ export default function App() {
       setTotalOfrendas(sumaFinanzas);
     });
 
-    // 3. Escuchar Eventos en tiempo real
+    // 3. Escuchar Eventos / Agenda en tiempo real
     const unsubEventos = onSnapshot(collection(db, "eventos"), (snapshot) => {
       setTotalEventos(snapshot.size);
     });
@@ -128,7 +128,6 @@ export default function App() {
   // --- VALIDACIÓN DE PERMISOS GRANULARES ESTRICTA ---
   const esAdmin = rolUsuario === 'admin';
 
-  // Si es Admin tiene acceso total, de lo contrario solo si Firestore indica estrictamente true
   const verDirectorio = esAdmin || (permisosModulos.directorio === true);
   const verFinanzas = esAdmin || (permisosModulos.finanzas === true);
   const verCooperativa = esAdmin || (permisosModulos.cooperativa === true);
@@ -146,7 +145,7 @@ export default function App() {
           {pestanaActiva === 'directorio' && 'Directorio'}
           {pestanaActiva === 'finanzas' && 'Finanzas'}
           {pestanaActiva === 'cooperativa' && 'Mini Cooperativa'}
-          {pestanaActiva === 'eventos' && 'Eventos y Calendario'}
+          {pestanaActiva === 'eventos' && 'Agenda / Calendario'}
           {pestanaActiva === 'roles' && 'Configuración y Roles'}
         </div>
       </header>
@@ -176,7 +175,7 @@ export default function App() {
             <span className="icon">📊</span> Portada
           </button>
           
-          {/* Directorio filtrado por permisos */}
+          {/* Directorio */}
           {verDirectorio && (
             <button 
               className={pestanaActiva === 'directorio' ? 'drawer-item active' : 'drawer-item'}
@@ -186,7 +185,7 @@ export default function App() {
             </button>
           )}
           
-          {/* Finanzas filtrado por permisos */}
+          {/* Finanzas */}
           {verFinanzas && (
             <button 
               className={pestanaActiva === 'finanzas' ? 'drawer-item active' : 'drawer-item'}
@@ -196,7 +195,7 @@ export default function App() {
             </button>
           )}
 
-          {/* Mini Cooperativa filtrado por permisos */}
+          {/* Mini Cooperativa */}
           {verCooperativa && (
             <button 
               className={pestanaActiva === 'cooperativa' ? 'drawer-item active' : 'drawer-item'}
@@ -206,17 +205,17 @@ export default function App() {
             </button>
           )}
           
-          {/* Eventos filtrado por permisos */}
+          {/* Agenda / Calendario (Eventos) */}
           {verEventos && (
             <button 
               className={pestanaActiva === 'eventos' ? 'drawer-item active' : 'drawer-item'}
               onClick={() => cambiarSeccion('eventos')}
             >
-              <span className="icon">📅</span> Eventos y Calendario
+              <span className="icon">📅</span> Agenda / Calendario
             </button>
           )}
 
-          {/* Configuración de Roles / Administración filtrado por permisos */}
+          {/* Configuración de Roles / Administración */}
           {verRolesConfig && (
             <button 
               className={pestanaActiva === 'roles' ? 'drawer-item active' : 'drawer-item'}
