@@ -1,160 +1,131 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { db } from '../firebase';
+import { collection, onSnapshot, doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function Dashboard() {
   const [ministerios, setMinisterios] = useState([]);
-  const [mostrarMinisterios, setMostrarMinisterios] = useState(false);
-  const [cargandoMin, setCargandoMin] = useState(true);
+  const [abiertoMinisterios, setAbiertoMinisterios] = useState(false);
+  const [notificacionMinisterios, setNotificacionMinisterios] = useState(0);
 
-  // --- ESTILOS DE PERSONALIZACIÓN ---
-  const [estilos, setEstilos] = useState(() => {
-    const guardado = localStorage.getItem('congregacion360_estilos');
-    if (guardado) {
-      const parsed = JSON.parse(guardado);
-      return parsed.directorio || {}; 
-    }
-    return {
-      boton: '#3182ce',
-      fondo: '#1a202c',
-      tipografia: 'Inter, sans-serif',
-      encabezadoColor: '#ffffff',
-      encabezadoTamano: '24px',
-      encabezadoNegrita: true,
-      encabezadoCursiva: false,
-      subtituloColor: '#a0aec0',
-      subtituloTamano: '14px',
-      subtituloNegrita: false,
-      subtituloCursiva: false
-    };
-  });
-
+  // Cargar ministerios en tiempo real desde Firestore
   useEffect(() => {
-    const actualizarEstilosLocales = () => {
-      const guardado = localStorage.getItem('congregacion360_estilos');
-      if (guardado) {
-        const parsed = JSON.parse(guardado);
-        if (parsed.directorio) setEstilos(parsed.directorio);
+    const unsubscribeMin = onSnapshot(collection(db, "ministerios"), async (snapshot) => {
+      const listaMin = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMinisterios(listaMin);
+
+      try {
+        const docRef = doc(db, "config_cooperativas", "ultimasVisitas");
+        const docSnap = await getDoc(docRef);
+        const ultimaVisitaMin = docSnap.exists() ? docSnap.data().ministerios?.toDate() || new Date(0) : new Date(0);
+
+        const nuevosCount = listaMin.filter(min => min.creadoEn && min.creadoEn.toDate() > ultimaVisitaMin).length;
+        setNotificacionMinisterios(nuevosCount);
+      } catch (e) {
+        console.error("Error al calcular notificaciones:", e);
       }
-    };
-
-    window.addEventListener('estilosActualizados', actualizarEstilosLocales);
-
-    const unsubscribe = onSnapshot(collection(db, "ministerios"), (snapshot) => {
-      const lista = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setMinisterios(lista);
-      setCargandoMin(false);
     }, (error) => {
-      console.error("Error al cargar ministerios:", error);
-      setCargandoMin(false);
+      console.error("Error al conectar con ministerios:", error);
     });
 
-    return () => {
-      window.removeEventListener('estilosActualizados', actualizarEstilosLocales);
-      unsubscribe();
-    };
+    return () => unsubscribeMin();
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Error al cerrar sesión:", error);
+  const manejarClickMinisterios = async () => {
+    setAbiertoMinisterios(!abiertoMinisterios);
+    if (!abiertoMinisterios && notificacionMinisterios > 0) {
+      setNotificacionMinisterios(0);
+      try {
+        const docRef = doc(db, "config_cooperativas", "ultimasVisitas");
+        await setDoc(docRef, { ministerios: new Date() }, { merge: true });
+      } catch (e) {
+        console.error("Error al actualizar última visita:", e);
+      }
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1100px', margin: '0 auto', background: estilos.fondo || '#1a202c', minHeight: '80vh', fontFamily: estilos.tipografia || 'Inter, sans-serif', color: '#fff', borderRadius: '8px' }}>
-      
-      {/* CABECERA CON BOTÓN DE CERRAR SESIÓN */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
-        <button 
-          onClick={handleLogout}
-          style={{ 
-            background: '#e53e3e', 
-            color: '#fff', 
-            border: 'none', 
-            padding: '8px 15px', 
-            borderRadius: '6px', 
-            fontWeight: 'bold', 
-            cursor: 'pointer',
-            fontSize: '13px'
-          }}
-        >
-          Cerrar Sesión
-        </button>
+    <div style={{ padding: '30px', fontFamily: 'Inter, sans-serif', background: '#0f172a', minHeight: '100vh', color: '#fff' }}>
+      <div style={{ marginBottom: '30px' }}>
+        <h1 style={{ fontSize: '26px', fontWeight: 'bold', margin: 0 }}>Dashboard Principal (Versión 1.0.1)</h1>
+        <p style={{ color: '#94a3b8', fontSize: '14px', marginTop: '5px' }}>Bienvenido al panel de control de tu congregación.</p>
       </div>
 
-      <h1 style={{ 
-        color: estilos.encabezadoColor || '#ffffff', 
-        fontSize: estilos.encabezadoTamano || '24px', 
-        fontWeight: estilos.encabezadoNegrita ? 'bold' : 'normal', 
-        fontStyle: estilos.encabezadoCursiva ? 'italic' : 'normal',
-        marginBottom: '5px' 
-      }}>
-        Bienvenido a Congregación 360
-      </h1>
+      {/* Contenedor del Botón Desplegable */}
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <button 
+          onClick={manejarClickMinisterios}
+          style={{
+            background: '#1e293b',
+            color: '#ffffff',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            border: '1px solid #334155',
+            cursor: 'pointer',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontSize: '15px'
+          }}
+        >
+          <span>⛪ Ministerios</span>
+          
+          {notificacionMinisterios > 0 && (
+            <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', padding: '2px 7px', fontSize: '11px', fontWeight: 'bold' }}>
+              {notificacionMinisterios}
+            </span>
+          )}
 
-      <p style={{ 
-        color: estilos.subtituloColor || '#a0aec0', 
-        fontSize: estilos.subtituloTamano || '14px', 
-        fontWeight: estilos.subtituloNegrita ? 'bold' : 'normal',
-        fontStyle: estilos.subtituloCursiva ? 'italic' : 'normal',
-        marginBottom: '25px' 
-      }}>
-        Panel principal de control y resumen general de la congregación.
-      </p>
+          <span style={{ fontSize: '12px', color: '#94a3b8' }}>{abiertoMinisterios ? '▲' : '▼'}</span>
+        </button>
 
-      {/* SECCIÓN INTERACTIVA: MINISTERIOS ACTIVOS */}
-      <div 
-        onClick={() => setMostrarMinisterios(!mostrarMinisterios)}
-        style={{ 
-          background: '#2d3748', 
-          padding: '20px', 
-          borderRadius: '8px', 
-          cursor: 'pointer', 
-          border: `1px solid ${estilos.boton || '#3182ce'}`,
-          transition: 'all 0.3s ease',
-          marginBottom: '20px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ margin: 0, color: '#fff', fontSize: '18px' }}>⛪ Ministerios Activos</h3>
-            <p style={{ margin: '5px 0 0 0', color: '#a0aec0', fontSize: '13px' }}>
-              {cargandoMin ? 'Cargando ministerios...' : `Total registrados: ${ministerios.length} (Haz clic para ${mostrarMinisterios ? 'ocultar' : 'ver'} detalles)`}
-            </p>
-          </div>
-          <span style={{ fontSize: '20px', color: estilos.boton || '#3182ce', fontWeight: 'bold' }}>
-            {mostrarMinisterios ? '▲' : '▼'}
-          </span>
-        </div>
+        {/* Menú Desplegable Flotante */}
+        {abiertoMinisterios && (
+          <div style={{
+            position: 'absolute',
+            top: '110%',
+            left: 0,
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '8px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.4)',
+            minWidth: '240px',
+            zIndex: 100,
+            overflow: 'hidden'
+          }}>
+            <div style={{ padding: '10px 15px', borderBottom: '1px solid #334155', fontSize: '12px', color: '#94a3b8', fontWeight: 'bold' }}>
+              LISTA DE MINISTERIOS ({ministerios.length})
+            </div>
 
-        {mostrarMinisterios && (
-          <div style={{ marginTop: '15px', borderTop: '1px solid #4a5568', paddingTop: '15px' }} onClick={(e) => e.stopPropagation()}>
-            {ministerios.length === 0 ? (
-              <p style={{ color: '#a0aec0', fontSize: '14px', fontStyle: 'italic' }}>No hay ministerios registrados aún.</p>
+            {ministerios.length > 0 ? (
+              ministerios.map((min) => (
+                <div 
+                  key={min.id}
+                  style={{
+                    padding: '12px 15px',
+                    color: '#f8fafc',
+                    borderBottom: '1px solid #273548',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#334155'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  onClick={() => {
+                    alert(`Seleccionaste el ministerio: ${min.nombre}`);
+                    setAbiertoMinisterios(false);
+                  }}
+                >
+                  {min.nombre}
+                </div>
+              ))
             ) : (
-              <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                {ministerios.map((min) => (
-                  <li key={min.id} style={{ background: '#1a202c', padding: '10px 15px', borderRadius: '6px', border: '1px solid #4a5568', fontSize: '14px', color: '#cbd5e0' }}>
-                    ✨ {min.nombre}
-                  </li>
-                ))}
-              </ul>
+              <div style={{ padding: '15px', color: '#64748b', fontSize: '13px', textAlign: 'center' }}>
+                No hay ministerios registrados
+              </div>
             )}
           </div>
         )}
       </div>
-
-      <div style={{ marginTop: '30px' }}>
-        <button style={{ background: estilos.boton || '#3182ce', color: '#fff', border: 'none', padding: '12px 25px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-          Acción Rápida del Sistema
-        </button>
-      </div>
-
     </div>
   );
 }

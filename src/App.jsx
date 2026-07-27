@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, collection, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot, setDoc } from "firebase/firestore";
 import Login from "./pages/Login";
 import Directorio from "./pages/Directorio";
 import FinancePage from "./components/FinancePage";
@@ -29,6 +29,11 @@ export default function App() {
   const [totalOfrendas, setTotalOfrendas] = useState(0);
   const [totalEventos, setTotalEventos] = useState(0);
   const [totalMinisterios, setTotalMinisterios] = useState(0);
+
+  // Estados específicos para el Desplegable de Ministerios y Notificaciones
+  const [listaMinisteriosDocs, setListaMinisteriosDocs] = useState([]);
+  const [abiertoMinisterios, setAbiertoMinisterios] = useState(false);
+  const [notificacionMinisterios, setNotificacionMinisterios] = useState(0);
 
   // Escuchar el estado de autenticación y datos en tiempo real con onSnapshot
   useEffect(() => {
@@ -62,7 +67,6 @@ export default function App() {
       let sumaFinanzas = 0;
       snapshot.forEach((docItem) => {
         const data = docItem.data();
-        
         const montoExtraido = 
           Number(data.monto) || 
           Number(data.cantidad) || 
@@ -71,7 +75,6 @@ export default function App() {
           Number(data.total) || 
           Object.values(data).find(val => typeof val === 'number') || 
           0;
-
         sumaFinanzas += Number(montoExtraido);
       });
       setTotalOfrendas(sumaFinanzas);
@@ -82,9 +85,23 @@ export default function App() {
       setTotalEventos(snapshot.size);
     });
 
-    // 4. Escuchar Ministerios en tiempo real
-    const unsubMinisterios = onSnapshot(collection(db, "ministerios"), (snapshot) => {
-      setTotalMinisterios(snapshot.size > 0 ? snapshot.size : 4);
+    // 4. Escuchar Ministerios en tiempo real, guardar lista y calcular notificaciones
+    const unsubMinisterios = onSnapshot(collection(db, "ministerios"), async (snapshot) => {
+      const listaMin = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setListaMinisteriosDocs(listaMin);
+      setTotalMinisterios(listaMin.length > 0 ? listaMin.length : 4);
+
+      // Calcular notificaciones rojas basadas en la última visita
+      try {
+        const docRef = doc(db, "config_cooperativas", "ultimasVisitas");
+        const docSnap = await getDoc(docRef);
+        const ultimaVisitaMin = docSnap.exists() ? docSnap.data().ministerios?.toDate() || new Date(0) : new Date(0);
+
+        const nuevosCount = listaMin.filter(min => min.creadoEn && min.creadoEn.toDate() > ultimaVisitaMin).length;
+        setNotificacionMinisterios(nuevosCount);
+      } catch (e) {
+        console.error("Error al calcular notificaciones de ministerios:", e);
+      }
     });
 
     return () => {
@@ -95,6 +112,20 @@ export default function App() {
       unsubMinisterios();
     };
   }, []);
+
+  // Función al hacer clic en el desplegable de ministerios para limpiar notificación
+  const manejarClickMinisterios = () => {
+    setAbiertoMinisterios(!abiertoMinisterios);
+    if (!abiertoMinisterios && notificacionMinisterios > 0) {
+      setNotificacionMinisterios(0);
+      try {
+        const docRef = doc(db, "config_cooperativas", "ultimasVisitas");
+        setDoc(docRef, { ministerios: new Date() }, { merge: true });
+      } catch (e) {
+        console.error("Error al actualizar última visita:", e);
+      }
+    }
+  };
 
   if (cargandoAuth) {
     return (
@@ -167,7 +198,6 @@ export default function App() {
         </div>
 
         <div className="drawer-options">
-          {/* Portada visible para todos */}
           <button 
             className={pestanaActiva === 'dashboard' ? 'drawer-item active' : 'drawer-item'}
             onClick={() => cambiarSeccion('dashboard')}
@@ -175,7 +205,6 @@ export default function App() {
             <span className="icon">📊</span> Portada
           </button>
           
-          {/* Directorio */}
           {verDirectorio && (
             <button 
               className={pestanaActiva === 'directorio' ? 'drawer-item active' : 'drawer-item'}
@@ -185,7 +214,6 @@ export default function App() {
             </button>
           )}
           
-          {/* Finanzas */}
           {verFinanzas && (
             <button 
               className={pestanaActiva === 'finanzas' ? 'drawer-item active' : 'drawer-item'}
@@ -195,7 +223,6 @@ export default function App() {
             </button>
           )}
 
-          {/* Mini Cooperativa */}
           {verCooperativa && (
             <button 
               className={pestanaActiva === 'cooperativa' ? 'drawer-item active' : 'drawer-item'}
@@ -205,7 +232,6 @@ export default function App() {
             </button>
           )}
           
-          {/* Agenda / Calendario (Eventos) */}
           {verEventos && (
             <button 
               className={pestanaActiva === 'eventos' ? 'drawer-item active' : 'drawer-item'}
@@ -215,7 +241,6 @@ export default function App() {
             </button>
           )}
 
-          {/* Configuración de Roles / Administración */}
           {verRolesConfig && (
             <button 
               className={pestanaActiva === 'roles' ? 'drawer-item active' : 'drawer-item'}
@@ -235,10 +260,9 @@ export default function App() {
             <span className="icon">🚪</span> Cerrar Sesión
           </button>
           
-          {/* Versión de la App centrada */}
           <div style={{ marginTop: '10px', textAlign: 'center', width: '100%' }}>
             <span style={{ fontSize: '12px', color: '#a0aec0' }}>
-              Versión de la App: <strong>1.0.0</strong>
+              Versión de la App: <strong>1.0.1</strong>
             </span>
           </div>
         </div>
@@ -279,9 +303,86 @@ export default function App() {
                 <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.8rem' }}>{totalEventos}</h3>
               </div>
 
-              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #805ad5' }}>
-                <p style={{ margin: '0 0 8px 0', color: '#718096', fontSize: '14px', fontWeight: '600' }}>Ministerios Activos</p>
-                <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.8rem' }}>{totalMinisterios}</h3>
+              {/* TARJETA DE MINISTERIOS CON EL BOTÓN Y MENÚ DESPLEGABLE */}
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderLeft: '4px solid #805ad5', position: 'relative', overflow: 'visible' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ margin: '0 0 8px 0', color: '#718096', fontSize: '14px', fontWeight: '600' }}>Ministerios Activos</p>
+                    <h3 style={{ margin: 0, color: '#2d3748', fontSize: '1.8rem' }}>{totalMinisterios}</h3>
+                  </div>
+
+                  <button 
+                    onClick={manejarClickMinisterios}
+                    style={{
+                      background: '#805ad5',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>Ver lista</span>
+                    {notificacionMinisterios > 0 && (
+                      <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', padding: '1px 6px', fontSize: '10px' }}>
+                        {notificacionMinisterios}
+                      </span>
+                    )}
+                    <span>{abiertoMinisterios ? '▲' : '▼'}</span>
+                  </button>
+                </div>
+
+                {/* MENÚ DESPLEGABLE FLOTANTE */}
+                {abiertoMinisterios && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 5px)',
+                    left: '20px',
+                    right: '20px',
+                    background: '#1a202c',
+                    border: '1px solid #4a5568',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px -3px rgba(0,0,0,0.5)',
+                    zIndex: 9999,
+                    maxHeight: '220px',
+                    overflowY: 'auto'
+                  }}>
+                    <div style={{ padding: '8px 12px', borderBottom: '1px solid #4a5568', fontSize: '11px', color: '#a0aec0', fontWeight: 'bold' }}>
+                      LISTADO DE MINISTERIOS ({listaMinisteriosDocs.length})
+                    </div>
+                    {listaMinisteriosDocs.length > 0 ? (
+                      listaMinisteriosDocs.map((min) => (
+                        <div 
+                          key={min.id}
+                          style={{
+                            padding: '12px 15px',
+                            color: '#ffffff',
+                            borderBottom: '1px solid #2d3748',
+                            fontSize: '14px',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#2d3748'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          onClick={() => {
+                            alert(`Ministerio seleccionado: ${min.nombre || min.id}`);
+                            setAbiertoMinisterios(false);
+                          }}
+                        >
+                          {min.nombre ? min.nombre : `Ministerio sin nombre (ID: ${min.id})`}
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ padding: '15px', color: '#a0aec0', fontSize: '13px', textAlign: 'center' }}>
+                        No hay ministerios registrados en Firestore
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
             </div>
