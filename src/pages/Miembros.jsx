@@ -282,7 +282,7 @@ export default function Miembros({ usuarioActualId }) {
                   <td style={{ padding: '12px 15px', fontWeight: 'bold' }}>{u.nombre || 'Sin nombre'}</td>
                   <td style={{ padding: '12px 15px', color: '#90cdf4' }}>{u.usuario}</td>
                   <td style={{ padding: '12px 15px' }}>
-                    <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', background: u.rol === 'admin' ? '#2b6cb0' : (u.rol === 'pastor' ? '#805ad5' : '#3182ce'), color: '#fff' }}>
+                    <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', background: u.rol === 'admin' ? '#2b6cb0' : (u.rol === 'pastor' ? '#805ad5' : '#1a551d'), color: '#fff' }}>
                       {u.rol || 'miembro'}
                     </span>
                   </td>
